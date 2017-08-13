@@ -630,6 +630,10 @@ cc_library(
         ":training_ops_op_lib",
         ":user_ops_op_lib",
         ":word2vec_ops",
+        ":dragnn_ops_op_lib",
+        ":dragnn_bulk_ops_op_lib",
+        ":parser_ops_op_lib"
+
     ] + tf_additional_cloud_op_deps(),
     alwayslink = 1,
 )
@@ -3126,3 +3130,42 @@ alias(
     actual = ":mobile_srcs",
     visibility = ["//visibility:public"],
 )
+
+# syntaxnet hack
+
+
+
+
+
+# py graph builder and trainer
+
+# syntaxnet ops
+tf_gen_op_libs(
+    op_lib_names = ["parser_ops"],
+    srcs = ["syntaxnet/ops/parser_ops.cc"],
+    #deps = ["@org_tensorflow//tensorflow/core/syntaxnet:parser_ops_cc"],
+)
+
+# dragnn ops
+
+tf_gen_op_libs(
+    op_lib_names = ["compute_session_op","dragnn_ops", "dragnn_bulk_ops", ],
+    srcs = ["dragnn/ops/dragnn_ops.cc"],
+    #deps = ["@org_tensorflow//tensorflow/core/dragnn:dragnn_ops_cc"],
+)
+
+tf_gen_op_libs(
+    op_lib_names = [],
+    srcs = ["dragnn/ops/dragnn_bulk_ops.cc"],
+    #deps = ["@org_tensorflow//tensorflow/core/dragnn:dragnn_bulk_ops_cc"],
+)
+
+#tf_gen_op_wrapper_py(
+#    name = "dragnn_ops",
+#    deps = [":dragnn_ops_op_lib"],
+#)
+
+#tf_gen_op_wrapper_py(
+#    name = "dragnn_bulk_ops",
+#    deps = [":dragnn_bulk_ops_op_lib"],
+#)

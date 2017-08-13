@@ -193,21 +193,31 @@ def tf_opts_nortti_if_android():
 
 # Given a list of "op_lib_names" (a list of files in the ops directory
 # without their .cc extensions), generate a library for that file.
-def tf_gen_op_libs(op_lib_names, deps=None):
+def tf_gen_op_libs(op_lib_names, deps=None, srcs=None):
   # Make library out of each op so it can also be used to generate wrappers
   # for various languages.
   if not deps:
     deps = []
-  for n in op_lib_names:
-    native.cc_library(
-        name=n + "_op_lib",
-        copts=tf_copts(),
-        srcs=["ops/" + n + ".cc"],
-        deps=deps + [clean_dep("//tensorflow/core:framework")],
-        visibility=["//visibility:public"],
-        alwayslink=1,
-        linkstatic=1,)
-
+  if not srcs:
+    for n in op_lib_names:
+      native.cc_library(
+          name=n + "_op_lib",
+          copts=tf_copts(),
+          srcs=["ops/" + n + ".cc"],
+          deps=deps + [clean_dep("//tensorflow/core:framework")],
+          visibility=["//visibility:public"],
+          alwayslink=1,
+          linkstatic=1,)
+  else:
+    for n, s in zip(op_lib_names, srcs):
+      native.cc_library(
+          name=n + "_op_lib",
+          copts=tf_copts(),
+          srcs=[s],
+          deps=deps + [clean_dep("//tensorflow/core:framework")],
+          visibility=["//visibility:public"],
+          alwayslink=1,
+          linkstatic=1,)
 
 def tf_gen_op_wrapper_cc(name,
                          out_ops_file,
@@ -333,7 +343,7 @@ def tf_gen_op_wrappers_cc(name,
       ]),
       copts=tf_copts(),
       alwayslink=1,
-      visibility=[clean_dep("//tensorflow:internal")])
+      visibility=[clean_dep("//visibility:public")])
 
 
 # Invoke this rule in .../tensorflow/python to build the wrapper library.
