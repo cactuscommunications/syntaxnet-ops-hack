@@ -32,7 +32,7 @@
 #define UTIL_UTF8_UNILIB_H__
 
 #include <string>
-#include "syntaxnet/base.h"
+#include "tensorflow/core/syntaxnet/base.h"
 
 // We export OneCharLen, IsValidCodepoint, and IsTrailByte from here,
 // but they are defined in unilib_utf8_utils.h.

@@ -1,9 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
 load(
-    "@org_tensorflow//tensorflow/core/syntaxnet:syntaxnet.bzl",
+    "//tensorflow/core/syntaxnet:syntaxnet.bzl",
     "tf_proto_library",
-    #"tf_proto_library_py",
+    "tf_proto_library_py",
 )
 
 # Protos.
@@ -26,18 +26,18 @@ tf_proto_library(
     srcs = ["spec.proto"],
 )
 
-#tf_proto_library_py(
-#    name = "data_py_pb2",
-#    srcs = ["data.proto"],
-#)
-#
-#tf_proto_library_py(
-#    name = "trace_py_pb2",
-#    srcs = ["trace.proto"],
-#    deps = [":data_py_pb2"],
-#)
-#
-#tf_proto_library_py(
-#    name = "spec_py_pb2",
-#    srcs = ["spec.proto"],
-#)
+tf_proto_library_py(
+    name = "data_py_pb2",
+    srcs = ["data.proto"],
+)
+
+tf_proto_library_py(
+    name = "trace_py_pb2",
+    srcs = ["trace.proto"],
+    deps = [":data_py_pb2"],
+)
+
+tf_proto_library_py(
+    name = "spec_py_pb2",
+    srcs = ["spec.proto"],
+)

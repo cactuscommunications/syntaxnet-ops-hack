@@ -18,20 +18,20 @@
 
 #include <vector>
 
-#include "dragnn/components/syntaxnet/syntaxnet_link_feature_extractor.h"
-#include "dragnn/components/syntaxnet/syntaxnet_transition_state.h"
-#include "dragnn/components/util/bulk_feature_extractor.h"
-#include "dragnn/core/beam.h"
-#include "dragnn/core/input_batch_cache.h"
-#include "dragnn/core/interfaces/component.h"
-#include "dragnn/core/interfaces/transition_state.h"
-#include "dragnn/protos/data.pb.h"
-#include "dragnn/protos/spec.pb.h"
-#include "dragnn/protos/trace.pb.h"
-#include "syntaxnet/base.h"
-#include "syntaxnet/parser_transitions.h"
-#include "syntaxnet/registry.h"
-#include "syntaxnet/task_context.h"
+#include "tensorflow/core/dragnn/components/syntaxnet/syntaxnet_link_feature_extractor.h"
+#include "tensorflow/core/dragnn/components/syntaxnet/syntaxnet_transition_state.h"
+#include "tensorflow/core/dragnn/components/util/bulk_feature_extractor.h"
+#include "tensorflow/core/dragnn/beam.h"
+#include "tensorflow/core/dragnn/input_batch_cache.h"
+#include "tensorflow/core/dragnn/interfaces/component.h"
+#include "tensorflow/core/dragnn/interfaces/transition_state.h"
+#include "tensorflow/core/dragnn/protos/data.pb.h"
+#include "tensorflow/core/dragnn/protos/spec.pb.h"
+#include "tensorflow/core/dragnn/protos/trace.pb.h"
+#include "tensorflow/core/syntaxnet/base.h"
+#include "tensorflow/core/syntaxnet/parser_transitions.h"
+#include "tensorflow/core/syntaxnet/registry.h"
+#include "tensorflow/core/syntaxnet/task_context.h"
 
 namespace syntaxnet {
 namespace dragnn {

@@ -42,7 +42,7 @@ limitations under the License.
 
 #include <string>
 
-#include "feature_extractor.pb.h"
+#include "tensorflow/core/syntaxnet/feature_extractor.pb.h"
 #include "utils.h"
 
 namespace syntaxnet {

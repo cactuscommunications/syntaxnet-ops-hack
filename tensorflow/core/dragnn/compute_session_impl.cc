@@ -13,15 +13,15 @@
 // limitations under the License.
 // =============================================================================
 
-#include "dragnn/core/compute_session_impl.h"
+#include "compute_session_impl.h"
 
 #include <algorithm>
 #include <utility>
 
-#include "dragnn/protos/data.pb.h"
-#include "dragnn/protos/spec.pb.h"
-#include "dragnn/protos/trace.pb.h"
-#include "syntaxnet/registry.h"
+#include "tensorflow/core/dragnn/protos/data.pb.h"
+#include "tensorflow/core/dragnn/protos/spec.pb.h"
+#include "tensorflow/core/dragnn/protos/trace.pb.h"
+#include "tensorflow/core/syntaxnet/registry.h"
 #include "tensorflow/core/platform/logging.h"
 
 namespace syntaxnet {

@@ -199,25 +199,16 @@ def tf_gen_op_libs(op_lib_names, deps=None, srcs=None):
   if not deps:
     deps = []
   if not srcs:
-    for n in op_lib_names:
-      native.cc_library(
-          name=n + "_op_lib",
-          copts=tf_copts(),
-          srcs=["ops/" + n + ".cc"],
-          deps=deps + [clean_dep("//tensorflow/core:framework")],
-          visibility=["//visibility:public"],
-          alwayslink=1,
-          linkstatic=1,)
-  else:
-    for n, s in zip(op_lib_names, srcs):
-      native.cc_library(
-          name=n + "_op_lib",
-          copts=tf_copts(),
-          srcs=[s],
-          deps=deps + [clean_dep("//tensorflow/core:framework")],
-          visibility=["//visibility:public"],
-          alwayslink=1,
-          linkstatic=1,)
+    srcs = []
+  for n in op_lib_names:
+    native.cc_library(
+        name=n + "_op_lib",
+        copts=tf_copts(),
+        srcs=srcs + ["ops/" + n + ".cc"],
+        deps=deps + [clean_dep("//tensorflow/core:framework")],
+        visibility=["//visibility:public"],
+        alwayslink=1,
+        linkstatic=1,)
 
 def tf_gen_op_wrapper_cc(name,
                          out_ops_file,
@@ -879,7 +870,7 @@ def cc_header_only_library(name, deps=[], **kwargs):
 
 def tf_custom_op_library_additional_deps():
   return [
-      "@protobuf_archive//:protobuf_headers",
+      "@com_google_protobuf//:protobuf_headers",
       clean_dep("//third_party/eigen3"),
       clean_dep("//tensorflow/core:framework_headers_lib"),
   ]

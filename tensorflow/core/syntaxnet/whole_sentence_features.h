@@ -16,7 +16,7 @@ limitations under the License.
 // Features for whole Sentence objects.  Contrast with SentenceFeature, which
 // operates on tokens within Sentences.
 
-#include "syntaxnet/feature_extractor.h"
+#include "feature_extractor.h"
 
 #ifndef SYNTAXNET_WHOLE_SENTENCE_FEATURES_H_
 #define SYNTAXNET_WHOLE_SENTENCE_FEATURES_H_

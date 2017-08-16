@@ -26,7 +26,7 @@ limitations under the License.
 #include <utility>
 #include <vector>
 
-#include "syntaxnet/utils.h"
+#include "utils.h"
 
 namespace syntaxnet {
 

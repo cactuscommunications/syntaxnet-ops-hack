@@ -18,8 +18,8 @@
 
 #include <memory>
 
-#include "dragnn/core/compute_session.h"
-#include "dragnn/protos/spec.pb.h"
+#include "tensorflow/core/dragnn/compute_session.h"
+#include "tensorflow/core/dragnn/protos/spec.pb.h"
 #include "tensorflow/core/platform/mutex.h"
 
 namespace syntaxnet {

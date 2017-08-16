@@ -201,10 +201,10 @@ public final class Tensor implements AutoCloseable {
 
   // Helper function to allocate a Tensor for the create() methods that create a Tensor from
   // a java.nio.Buffer.
-  private static Tensor allocateForBuffer(DataType dataType, long[] shape, int nBuffered) {
-    final int nflattened = numElements(shape);
+  private static Tensor allocateForBuffer(final DataType dataType, final long[] shape, final int nBuffered) {
     int nbytes = 0;
     if (dataType != DataType.STRING) {
+      final int nflattened = numElements(shape);
       if (nBuffered != nflattened) {
         throw incompatibleBuffer(nBuffered, shape);
       }

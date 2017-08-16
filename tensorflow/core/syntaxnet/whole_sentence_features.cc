@@ -13,17 +13,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "syntaxnet/whole_sentence_features.h"
+#include "whole_sentence_features.h"
 
 #include <limits.h>
 #include <algorithm>
 #include <string>
 
-#include "syntaxnet/base.h"
-#include "syntaxnet/feature_types.h"
-#include "syntaxnet/registry.h"
-#include "syntaxnet/task_context.h"
-#include "syntaxnet/workspace.h"
+#include "base.h"
+#include "feature_types.h"
+#include "registry.h"
+#include "task_context.h"
+#include "workspace.h"
 
 namespace syntaxnet {
 namespace {

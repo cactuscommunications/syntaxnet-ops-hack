@@ -24,7 +24,7 @@ limitations under the License.
 #include "document_format.h"
 #include "feature_types.h"
 #include "registry.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "task_context.h"
 #include "utils.h"
 #include "workspace.h"

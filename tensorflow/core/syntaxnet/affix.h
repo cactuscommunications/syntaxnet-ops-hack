@@ -20,7 +20,7 @@ limitations under the License.
 #include <string>
 #include <vector>
 
-#include "dictionary.pb.h"
+#include "tensorflow/core/syntaxnet/dictionary.pb.h"
 #include "feature_extractor.h"
 #include "proto_io.h"
 #include "task_context.h"

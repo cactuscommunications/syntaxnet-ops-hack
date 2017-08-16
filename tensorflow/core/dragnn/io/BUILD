@@ -6,9 +6,9 @@ cc_library(
     hdrs = ["sentence_input_batch.h"],
     deps = [
         ":syntaxnet_sentence",
-        "@org_tensorflow//tensorflow/core/dragnn/interfaces:input_batch",
-        "@org_tensorflow//tensorflow/core/syntaxnet:base",
-        "@org_tensorflow//tensorflow/core/syntaxnet:sentence_proto",
+        "//tensorflow/core/dragnn/interfaces:input_batch",
+        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/syntaxnet:sentence_proto",
     ],
 )
 
@@ -16,8 +16,8 @@ cc_library(
     name = "syntaxnet_sentence",
     hdrs = ["syntaxnet_sentence.h"],
     deps = [
-        "@org_tensorflow//tensorflow/core/syntaxnet:sentence_proto",
-        "@org_tensorflow//tensorflow/core/syntaxnet:workspace",
+        "//tensorflow/core/syntaxnet:sentence_proto",
+        "//tensorflow/core/syntaxnet:workspace",
     ],
 )
 
@@ -26,9 +26,9 @@ cc_library(
 #    srcs = ["sentence_input_batch_test.cc"],
 #    deps = [
 #        ":sentence_input_batch",
-#        "@org_tensorflow//tensorflow/core/dragnn/test:generic",
-#        "@org_tensorflow//tensorflow/core/syntaxnet:sentence_proto",
-#        "@org_tensorflow//tensorflow/core/syntaxnet:test_main",
-#        "@org_tensorflow//tensorflow/core:test",
+#        "//tensorflow/core/dragnn/test:generic",
+#        "//tensorflow/core/syntaxnet:sentence_proto",
+#        "//tensorflow/core/syntaxnet:test_main",
+#        "//tensorflow/core:test",
 #    ],
 #)

@@ -20,7 +20,7 @@
 // These definitions are self-contained and have no dependencies.
 // They are also exported from unilib.h for legacy reasons.
 
-#include "syntaxnet/base.h"
+#include "tensorflow/core/syntaxnet/base.h"
 #include "third_party/utf/utf.h"
 
 namespace UniLib {

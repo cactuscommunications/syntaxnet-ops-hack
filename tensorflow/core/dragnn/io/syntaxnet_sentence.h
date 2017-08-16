@@ -16,8 +16,8 @@
 #ifndef NLP_SAFT_OPENSOURCE_DRAGNN_IO_SYNTAXNET_SENTENCE_H_
 #define NLP_SAFT_OPENSOURCE_DRAGNN_IO_SYNTAXNET_SENTENCE_H_
 
-#include "syntaxnet/sentence.pb.h"
-#include "syntaxnet/workspace.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
+#include "tensorflow/core/syntaxnet/workspace.h"
 
 namespace syntaxnet {
 namespace dragnn {

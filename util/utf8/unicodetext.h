@@ -22,7 +22,7 @@
 #include <string>                       // for string
 #include <utility>                      // for pair
 
-#include "syntaxnet/base.h"
+#include "tensorflow/core/syntaxnet/base.h"
 
 // ***************************** UnicodeText **************************
 //

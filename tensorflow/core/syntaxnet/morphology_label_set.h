@@ -24,7 +24,7 @@ limitations under the License.
 #include <vector>
 
 #include "proto_io.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 
 namespace syntaxnet {
 

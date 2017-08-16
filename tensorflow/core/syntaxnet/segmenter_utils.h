@@ -20,7 +20,7 @@ limitations under the License.
 #include <unordered_set>
 #include <vector>
 
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "util/utf8/unicodetext.h"
 

@@ -24,7 +24,7 @@ limitations under the License.
 #include "base.h"
 #include "feature_extractor.h"
 #include "segmenter_utils.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "utils.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"

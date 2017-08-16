@@ -15,11 +15,11 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@org_tensorflow//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/syntaxnet:base",
         "//third_party/utf",
-        "@org_tensorflow//tensorflow/core:framework_headers_lib",
-        "@org_tensorflow//tensorflow/core:framework",
-        "@org_tensorflow//tensorflow/core:lib",
+        "//tensorflow/core:framework_headers_lib",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
     ],
 )
 
@@ -30,7 +30,7 @@ cc_test(
         "unicodetext_unittest.cc",
     ],
     deps = [
-        "@org_tensorflow//tensorflow/core:testlib",
+        "//tensorflow/core:testlib",
         ":unicodetext",
     ],
 )

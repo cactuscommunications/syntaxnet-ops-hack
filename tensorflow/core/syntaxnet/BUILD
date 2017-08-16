@@ -13,10 +13,22 @@ licenses(["notice"])  # Apache 2.0
 load(
     "syntaxnet",
     "tf_proto_library",
-    #"tf_proto_library_py",
-    "tf_gen_op_libs",
+    "tf_proto_library_py",
+    #"tf_gen_op_libs",
     #"tf_gen_op_wrapper_py",
 )
+
+#load(
+#    "//tensorflow/core:platform/default/build_config.bzl",
+#    "tf_proto_library",
+#    "tf_proto_library_py",
+#    #"tf_gen_op_libs",
+#    #"tf_gen_op_wrapper_py",
+#)
+
+
+
+
 
 # proto libraries
 
@@ -30,46 +42,46 @@ tf_proto_library(
     srcs = ["sentence.proto"],
 )
 
-#tf_proto_library_py(
-#    name = "sentence_py_pb2",
-#    srcs = ["sentence.proto"],
-#)
+tf_proto_library_py(
+    name = "sentence_py_pb2",
+    srcs = ["sentence.proto"],
+)
 
 tf_proto_library(
     name = "dictionary_proto",
     srcs = ["dictionary.proto"],
 )
 
-#tf_proto_library_py(
-#    name = "dictionary_py_pb2",
-#    srcs = ["dictionary.proto"],
-#)
+tf_proto_library_py(
+    name = "dictionary_py_pb2",
+    srcs = ["dictionary.proto"],
+)
 
-#tf_proto_library(
-#    name = "kbest_syntax_proto",
-#    srcs = ["kbest_syntax.proto"],
-#    deps = [":sentence_proto"],
-#)
+tf_proto_library(
+    name = "kbest_syntax_proto",
+    srcs = ["kbest_syntax.proto"],
+    deps = [":sentence_proto"],
+)
 
 tf_proto_library(
     name = "task_spec_proto",
     srcs = ["task_spec.proto"],
 )
 
-#tf_proto_library_py(
-#    name = "task_spec_py_pb2",
-#    srcs = ["task_spec.proto"],
-#)
+tf_proto_library_py(
+    name = "task_spec_py_pb2",
+    srcs = ["task_spec.proto"],
+)
 
 tf_proto_library(
     name = "sparse_proto",
     srcs = ["sparse.proto"],
 )
 
-#tf_proto_library_py(
-#    name = "sparse_py_pb2",
-#    srcs = ["sparse.proto"],
-#)
+tf_proto_library_py(
+    name = "sparse_py_pb2",
+    srcs = ["sparse.proto"],
+)
 
 # cc libraries for feature extraction and parsing
 
@@ -83,11 +95,11 @@ cc_library(
         "@org_tensorflow//third_party/eigen3",
     ] + select({
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:framework",
-            "@org_tensorflow//tensorflow/core:lib",
+            "//tensorflow/core:framework",
+            "//tensorflow/core:lib",
         ],
         "@org_tensorflow//tensorflow:darwin": [
-            "@org_tensorflow//tensorflow/core:framework_headers_lib",
+            "//tensorflow/core:framework_headers_lib",
         ],
     }),
 )
@@ -100,7 +112,9 @@ cc_library(
     ],
     deps = [
         ":base",
-        "@org_tensorflow//util/utf8:unicodetext",
+        "//util/utf8:unicodetext",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
     ],
 )
 
@@ -155,7 +169,7 @@ cc_library(
     deps = [
         ":registry",
         ":utils",
-        "@org_tensorflow//util/utf8:unicodetext",
+        "//util/utf8:unicodetext",
     ],
     alwayslink = 1,
 )
@@ -169,6 +183,7 @@ cc_library(
         ":segmenter_utils",
         ":task_context",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -179,7 +194,9 @@ cc_library(
         ":base",
         ":char_properties",
         ":sentence_proto",
-        "@org_tensorflow//util/utf8:unicodetext",
+        ":utils",
+        "//third_party/utf:utf",
+        "//util/utf8:unicodetext",
     ],
     alwayslink = 1,
 )
@@ -200,6 +217,7 @@ cc_library(
         ":utils",
         ":workspace",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -231,7 +249,7 @@ cc_library(
         ":shared_store",
         ":task_context",
         ":workspace",
-        "@org_tensorflow//util/utf8:unicodetext",
+        "//util/utf8:unicodetext",
     ],
     alwayslink = 1,
 )
@@ -265,6 +283,7 @@ cc_library(
     hdrs = ["registry.h"],
     deps = [
         ":utils",
+        "//tensorflow/core:framework",
     ],
 )
 
@@ -467,31 +486,31 @@ cc_library(
     deps = [
         ":utils",
         #"@org_tensorflow/util/utf8:unicodetext",
-        "@org_tensorflow//tensorflow/core:framework_headers_lib",
-        "@org_tensorflow//tensorflow/core:framework",
-        "@org_tensorflow//tensorflow/core:lib",
+        "//tensorflow/core:framework_headers_lib",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
         ":base",
         ":sparse_proto",
     ],
     alwayslink = 1,
 )
 
-cc_library(
-    name = "parser_ops_cc",
-    srcs = ["ops/parser_ops.cc"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":base",
-        ":document_filters",
-        ":lexicon_builder",
-        ":reader_ops",
-        ":unpack_sparse_features",
-        "@org_tensorflow//tensorflow/core:framework",
-        "@org_tensorflow//tensorflow/core:lib",
-        "@org_tensorflow//tensorflow/core:framework_headers_lib"
-    ],
-    alwayslink = 1,
-)
+#cc_library(
+#    name = "parser_ops_cc",
+#    srcs = ["ops/parser_ops.cc"],
+#    visibility = ["//visibility:public"],
+#    deps = [
+#        ":base",
+#        ":document_filters",
+#        ":lexicon_builder",
+#        ":reader_ops",
+#        ":unpack_sparse_features",
+#        "//tensorflow/core:framework",
+#        "//tensorflow/core:lib",
+#        "//tensorflow/core:framework_headers_lib"
+#    ],
+#    alwayslink = 1,
+#)
 
 cc_binary(
     name = "parser_ops.so",

@@ -1,15 +1,15 @@
 """Wrapper around cc_proto_library used inside the XLA codebase."""
 
-load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
 
 # xla_proto_library() is a convenience wrapper around cc_proto_library.
 def xla_proto_library(name, srcs=[], deps=[], visibility=None, testonly=0):
   cc_proto_library(name=name,
                    srcs=srcs,
                    deps=deps,
-                   cc_libs = ["@protobuf_archive//:protobuf"],
-                   protoc="@protobuf_archive//:protoc",
-                   default_runtime="@protobuf_archive//:protobuf",
+                   cc_libs = ["@com_google_protobuf//:protobuf"],
+                   protoc="@com_google_protobuf//:protoc",
+                   default_runtime="@com_google_protobuf//:protobuf",
                    testonly=testonly,
                    visibility=visibility,)
 

@@ -18,12 +18,12 @@
 
 #include <vector>
 
-#include "dragnn/core/interfaces/cloneable_transition_state.h"
-#include "dragnn/core/interfaces/transition_state.h"
-#include "dragnn/io/syntaxnet_sentence.h"
-#include "dragnn/protos/trace.pb.h"
-#include "syntaxnet/base.h"
-#include "syntaxnet/parser_state.h"
+#include "tensorflow/core/dragnn/interfaces/cloneable_transition_state.h"
+#include "tensorflow/core/dragnn/interfaces/transition_state.h"
+#include "tensorflow/core/dragnn/io/syntaxnet_sentence.h"
+#include "tensorflow/core/dragnn/protos/trace.pb.h"
+#include "tensorflow/core/syntaxnet/base.h"
+#include "tensorflow/core/syntaxnet/parser_state.h"
 
 namespace syntaxnet {
 namespace dragnn {

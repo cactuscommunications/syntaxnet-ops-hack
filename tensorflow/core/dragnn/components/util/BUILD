@@ -7,6 +7,6 @@ cc_library(
     name = "bulk_feature_extractor",
     hdrs = ["bulk_feature_extractor.h"],
     deps = [
-        "@org_tensorflow//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/syntaxnet:base",
     ],
 )

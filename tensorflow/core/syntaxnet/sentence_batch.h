@@ -25,7 +25,7 @@ limitations under the License.
 #include "feature_extractor.h"
 #include "parser_state.h"
 #include "parser_transitions.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "task_context.h"
 #include "term_frequency_map.h"
 

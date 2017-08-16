@@ -255,65 +255,65 @@ def tf_gen_op_wrappers_cc(name,
                     visibility=["@org_tensorflow//tensorflow:internal"])
 
 # Invoke this rule in .../tensorflow/python to build the wrapper library.
-#def tf_gen_op_wrapper_py(name, out=None, hidden=None, visibility=None, deps=[],
-#                         require_shape_functions=False, hidden_file=None,
-#                         generated_target_name=None):
-#  # Construct a cc_binary containing the specified ops.
-#  tool_name = "gen_" + name + "_py_wrappers_cc"
-#  if not deps:
-#    deps = ["@org_tensorflow//tensorflow/core:" + name + "_op_lib"]
-#  native.cc_binary(
-#      name = tool_name,
-#      linkopts = ["-lm"],
-#      copts = tf_copts(),
-#      linkstatic = 1,   # Faster to link this one-time-use binary dynamically
-#      deps = (["@org_tensorflow//tensorflow/core:framework",
-#               "@org_tensorflow//tensorflow/python:python_op_gen_main"] + deps),
-#      visibility = ["@org_tensorflow//tensorflow:internal"],
-#  )
-#
-#  # Invoke the previous cc_binary to generate a python file.
-#  if not out:
-#    out = "ops/gen_" + name + ".py"
-#
-#  if hidden:
-#    # `hidden` is a list of op names to be hidden in the generated module.
-#    native.genrule(
-#        name=name + "_pygenrule",
-#        outs=[out],
-#        tools=[tool_name],
-#        cmd=("$(location " + tool_name + ") " + ",".join(hidden)
-#             + " " + ("1" if require_shape_functions else "0") + " > $@"))
-#  elif hidden_file:
-#    # `hidden_file` is file containing a list of op names to be hidden in the
-#    # generated module.
-#    native.genrule(
-#        name=name + "_pygenrule",
-#        outs=[out],
-#        srcs=[hidden_file],
-#        tools=[tool_name],
-#        cmd=("$(location " + tool_name + ") @$(location "
-#             + hidden_file + ") " + ("1" if require_shape_functions else "0")
-#             + " > $@"))
-#  else:
-#    # No ops should be hidden in the generated module.
-#    native.genrule(
-#        name=name + "_pygenrule",
-#        outs=[out],
-#        tools=[tool_name],
-#        cmd=("$(location " + tool_name + ") "
-#             + ("1" if require_shape_functions else "0") + " > $@"))
-#
-#  # Make a py_library out of the generated python file.
-#  if not generated_target_name:
-#    generated_target_name = name
-#  native.py_library(name=generated_target_name,
-#                    srcs=[out],
-#                    srcs_version="PY2AND3",
-#                    visibility=visibility,
-#                    deps=[
-#                        "@org_tensorflow//tensorflow/python:framework_for_generated_wrappers",
-#                    ],)
+def tf_gen_op_wrapper_py(name, out=None, hidden=None, visibility=None, deps=[],
+                         require_shape_functions=False, hidden_file=None,
+                         generated_target_name=None):
+  # Construct a cc_binary containing the specified ops.
+  tool_name = "gen_" + name + "_py_wrappers_cc"
+  if not deps:
+    deps = ["@org_tensorflow//tensorflow/core:" + name + "_op_lib"]
+  native.cc_binary(
+      name = tool_name,
+      linkopts = ["-lm"],
+      copts = tf_copts(),
+      linkstatic = 1,   # Faster to link this one-time-use binary dynamically
+      deps = (["@org_tensorflow//tensorflow/core:framework",
+               "@org_tensorflow//tensorflow/python:python_op_gen_main"] + deps),
+      visibility = ["@org_tensorflow//tensorflow:internal"],
+  )
+
+  # Invoke the previous cc_binary to generate a python file.
+  if not out:
+    out = "ops/gen_" + name + ".py"
+
+  if hidden:
+    # `hidden` is a list of op names to be hidden in the generated module.
+    native.genrule(
+        name=name + "_pygenrule",
+        outs=[out],
+        tools=[tool_name],
+        cmd=("$(location " + tool_name + ") " + ",".join(hidden)
+             + " " + ("1" if require_shape_functions else "0") + " > $@"))
+  elif hidden_file:
+    # `hidden_file` is file containing a list of op names to be hidden in the
+    # generated module.
+    native.genrule(
+        name=name + "_pygenrule",
+        outs=[out],
+        srcs=[hidden_file],
+        tools=[tool_name],
+        cmd=("$(location " + tool_name + ") @$(location "
+             + hidden_file + ") " + ("1" if require_shape_functions else "0")
+             + " > $@"))
+  else:
+    # No ops should be hidden in the generated module.
+    native.genrule(
+        name=name + "_pygenrule",
+        outs=[out],
+        tools=[tool_name],
+        cmd=("$(location " + tool_name + ") "
+             + ("1" if require_shape_functions else "0") + " > $@"))
+
+  # Make a py_library out of the generated python file.
+  if not generated_target_name:
+    generated_target_name = name
+  native.py_library(name=generated_target_name,
+                    srcs=[out],
+                    srcs_version="PY2AND3",
+                    visibility=visibility,
+                    deps=[
+                        "@org_tensorflow//tensorflow/python:framework_for_generated_wrappers",
+                    ],)
 
 # Define a bazel macro that creates cc_test for tensorflow.
 # TODO(googleuser): we need to enable this to work around the hidden symbol

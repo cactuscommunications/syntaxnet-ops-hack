@@ -20,7 +20,7 @@ limitations under the License.
 #include "char_ngram_string_extractor.h"
 #include "feature_extractor.h"
 #include "segmenter_utils.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "sentence_batch.h"
 #include "term_frequency_map.h"
 #include "utils.h"

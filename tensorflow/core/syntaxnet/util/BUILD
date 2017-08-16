@@ -6,8 +6,8 @@ package(default_visibility = ["//visibility:public"])
 #    srcs = ["registry.py"],
 #    deps = [
 #        "//syntaxnet:load_parser_ops_py",
-#        "@org_tensorflow//tensorflow:tensorflow_py",
-#        "@org_tensorflow//tensorflow/core:protos_all_py",
+#        "//tensorflow:tensorflow_py",
+#        "//tensorflow/core:protos_all_py",
 #    ],
 #)
 #
@@ -41,8 +41,8 @@ package(default_visibility = ["//visibility:public"])
 #        ":pyregistry_test_base",
 #        ":pyregistry_test_impl",
 #        "//syntaxnet:load_parser_ops_py",
-#        "@org_tensorflow//tensorflow:tensorflow_py",
-#        "@org_tensorflow//tensorflow/core:protos_all_py",
+#        "//tensorflow:tensorflow_py",
+#        "//tensorflow/core:protos_all_py",
 #    ],
 #)
 #
@@ -52,7 +52,7 @@ package(default_visibility = ["//visibility:public"])
 #    deps = [
 #        ":check",
 #        "//syntaxnet:load_parser_ops_py",
-#        "@org_tensorflow//tensorflow:tensorflow_py",
-#        "@org_tensorflow//tensorflow/core:protos_all_py",
+#        "//tensorflow:tensorflow_py",
+#        "//tensorflow/core:protos_all_py",
 #    ],
 #)

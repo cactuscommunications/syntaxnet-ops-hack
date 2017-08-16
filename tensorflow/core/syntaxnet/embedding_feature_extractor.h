@@ -25,7 +25,7 @@ limitations under the License.
 #include "feature_types.h"
 #include "parser_features.h"
 #include "sentence_features.h"
-#include "sparse.pb.h"
+#include "tensorflow/core/syntaxnet/sparse.pb.h"
 #include "task_context.h"
 #include "utils.h"
 #include "workspace.h"

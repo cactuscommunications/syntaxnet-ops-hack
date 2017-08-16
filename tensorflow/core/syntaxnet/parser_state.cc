@@ -15,7 +15,7 @@ limitations under the License.
 
 #include "parser_state.h"
 
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "term_frequency_map.h"
 #include "utils.h"
 

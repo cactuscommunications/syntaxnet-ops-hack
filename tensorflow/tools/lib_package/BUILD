@@ -102,7 +102,7 @@ genrule(
         "@lmdb//:LICENSE",
         "@local_config_sycl//sycl:LICENSE.text",
         "@png_archive//:LICENSE",
-        "@protobuf_archive//:LICENSE",
+        "@com_google_protobuf//:LICENSE",
         "@snappy//:COPYING",
         "@zlib_archive//:zlib.h",
     ] + if_mkl([
@@ -136,7 +136,7 @@ genrule(
         "@lmdb//:LICENSE",
         "@local_config_sycl//sycl:LICENSE.text",
         "@png_archive//:LICENSE",
-        "@protobuf_archive//:LICENSE",
+        "@com_google_protobuf//:LICENSE",
         "@snappy//:COPYING",
         "@zlib_archive//:zlib.h",
     ] + if_mkl([

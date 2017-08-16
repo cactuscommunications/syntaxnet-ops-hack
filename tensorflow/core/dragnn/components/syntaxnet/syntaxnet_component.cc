@@ -17,17 +17,17 @@
 
 #include <vector>
 
-#include "dragnn/components/util/bulk_feature_extractor.h"
-#include "dragnn/core/component_registry.h"
-#include "dragnn/core/input_batch_cache.h"
-#include "dragnn/core/interfaces/component.h"
-#include "dragnn/core/interfaces/transition_state.h"
-#include "dragnn/io/sentence_input_batch.h"
-#include "dragnn/io/syntaxnet_sentence.h"
-#include "syntaxnet/parser_state.h"
-#include "syntaxnet/sparse.pb.h"
-#include "syntaxnet/task_spec.pb.h"
-#include "syntaxnet/utils.h"
+#include "tensorflow/core/dragnn/components/util/bulk_feature_extractor.h"
+#include "tensorflow/core/core/component_registry.h"
+#include "tensorflow/core/dragnn/input_batch_cache.h"
+#include "tensorflow/core/dragnn/interfaces/component.h"
+#include "tensorflow/core/dragnn/interfaces/transition_state.h"
+#include "tensorflow/core/dragnn/io/sentence_input_batch.h"
+#include "tensorflow/core/dragnn/io/syntaxnet_sentence.h"
+#include "tensorflow/core/syntaxnet/parser_state.h"
+#include "tensorflow/core/syntaxnet/sparse.pb.h"
+#include "tensorflow/core/syntaxnet/task_spec.pb.h"
+#include "tensorflow/core/syntaxnet/utils.h"
 #include "tensorflow/core/platform/logging.h"
 
 namespace syntaxnet {

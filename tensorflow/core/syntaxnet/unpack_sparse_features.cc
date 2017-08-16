@@ -22,7 +22,7 @@ limitations under the License.
 
 //#include "syntaxnet/sparse.pb.h"
 //#include "syntaxnet/utils.h"
-#include "sparse.pb.h"
+#include "tensorflow/core/syntaxnet/sparse.pb.h"
 #include "utils.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"

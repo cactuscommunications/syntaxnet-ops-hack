@@ -18,11 +18,11 @@
 
 #include <string>
 
-#include "dragnn/components/util/bulk_feature_extractor.h"
-#include "dragnn/core/index_translator.h"
-#include "dragnn/core/interfaces/component.h"
-#include "dragnn/protos/spec.pb.h"
-#include "dragnn/protos/trace.pb.h"
+#include "components/util/bulk_feature_extractor.h"
+#include "index_translator.h"
+#include "interfaces/component.h"
+#include "tensorflow/core/dragnn/protos/spec.pb.h"
+#include "tensorflow/core/dragnn/protos/trace.pb.h"
 
 namespace syntaxnet {
 namespace dragnn {

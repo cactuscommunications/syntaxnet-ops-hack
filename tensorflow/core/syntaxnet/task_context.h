@@ -19,7 +19,7 @@ limitations under the License.
 #include <string>
 #include <vector>
 
-#include "task_spec.pb.h"
+#include "tensorflow/core/syntaxnet/task_spec.pb.h"
 #include "utils.h"
 
 namespace syntaxnet {

@@ -40,7 +40,7 @@ limitations under the License.
 #include <string>
 #include <vector>
 
-#include "feature_extractor.pb.h"
+#include "tensorflow/core/syntaxnet/feature_extractor.pb.h"
 #include "feature_types.h"
 #include "proto_io.h"
 #include "registry.h"

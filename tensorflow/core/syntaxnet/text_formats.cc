@@ -18,7 +18,7 @@ limitations under the License.
 #include "base.h"
 #include "document_format.h"
 #include "segmenter_utils.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "utils.h"
 #include "tensorflow/core/lib/io/buffered_inputstream.h"
 #include "tensorflow/core/lib/strings/strcat.h"

@@ -20,7 +20,7 @@ cc_library(
         "//tensorflow/compiler/xla/service:layout_assignment",
         "//third_party/eigen3",
         "@local_config_cuda//cuda:cuda_headers",
-        "@protobuf_archive//:protobuf_headers",
+        "@com_google_protobuf//:protobuf_headers",
     ],
     alwayslink = 1,
 )

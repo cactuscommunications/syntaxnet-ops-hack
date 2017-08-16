@@ -13,12 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 
-#load("@protobuf//:protobuf.bzl", "cc_proto_library")
-#load("@protobuf//:protobuf.bzl", "py_proto_library")
+#load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+#load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+#load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+#load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
+#load("//tensorflow/core:platform/default/build_config.bzl", "tf_proto_library")
+#load("//tensorflow/core:platform/default/build_config.bzl", "tf_proto_library_py")
+
+load("//tensorflow/core:platform/default/build_config.bzl", "cc_proto_library")
+load("//tensorflow/core:platform/default/build_config.bzl", "py_proto_library")
 
 def if_cuda(if_true, if_false = []):
     """Shorthand for select()'ing on whether we're building with CUDA."""
@@ -64,50 +69,50 @@ def tf_proto_library_py(name, srcs=[], deps=[], visibility=None, testonly=0):
 
 # Given a list of "op_lib_names" (a list of files in the ops directory
 # without their .cc extensions), generate a library for that file.
-def tf_gen_op_libs(op_lib_names):
-  # Make library out of each op so it can also be used to generate wrappers
-  # for various languages.
-  for n in op_lib_names:
-    native.cc_library(name=n + "_op_lib",
-                      copts=tf_copts(),
-                      srcs=["ops/" + n + ".cc"],
-                      deps=(["@org_tensorflow//tensorflow/core:framework"]),
-                      visibility=["//visibility:public"],
-                      alwayslink=1,
-                      linkstatic=1,)
-
+#def tf_gen_op_libs(op_lib_names):
+#  # Make library out of each op so it can also be used to generate wrappers
+#  # for various languages.
+#  for n in op_lib_names:
+#    native.cc_library(name=n + "_op_lib",
+#                      copts=tf_copts(),
+#                      srcs=["ops/" + n + ".cc"],
+#                      deps=(["@org_tensorflow//tensorflow/core:framework"]),
+#                      visibility=["//visibility:public"],
+#                      alwayslink=1,
+#                      linkstatic=1,)
+#
 # Invoke this rule in .../tensorflow/python to build the wrapper library.
-def tf_gen_op_wrapper_py(name, out=None, hidden=[], visibility=None, deps=[],
-                         require_shape_functions=False):
-  # Construct a cc_binary containing the specified ops.
-  tool_name = "gen_" + name + "_py_wrappers_cc"
-  if not deps:
-    deps = ["//tensorflow/core:" + name + "_op_lib"]
-  native.cc_binary(
-      name = tool_name,
-      linkopts = ["-lm"],
-      copts = tf_copts(),
-      linkstatic = 1,   # Faster to link this one-time-use binary dynamically
-      deps = (["@org_tensorflow//tensorflow/core:framework",
-               "@org_tensorflow//tensorflow/python:python_op_gen_main"] + deps),
-  )
-
-  # Invoke the previous cc_binary to generate a python file.
-  if not out:
-    out = "ops/gen_" + name + ".py"
-
-  native.genrule(
-      name=name + "_pygenrule",
-      outs=[out],
-      tools=[tool_name],
-      cmd=("$(location " + tool_name + ") " + ",".join(hidden)
-           + " " + ("1" if require_shape_functions else "0") + " > $@"))
-
-  # Make a py_library out of the generated python file.
-  native.py_library(name=name,
-                    srcs=[out],
-                    srcs_version="PY2AND3",
-                    visibility=visibility,
-                    deps=[
-                        "@org_tensorflow//tensorflow/python:framework_for_generated_wrappers",
-                    ],)
+#def tf_gen_op_wrapper_py(name, out=None, hidden=[], visibility=None, deps=[],
+#                         require_shape_functions=False):
+#  # Construct a cc_binary containing the specified ops.
+#  tool_name = "gen_" + name + "_py_wrappers_cc"
+#  if not deps:
+#    deps = ["//tensorflow/core:" + name + "_op_lib"]
+#  native.cc_binary(
+#      name = tool_name,
+#      linkopts = ["-lm"],
+#      copts = tf_copts(),
+#      linkstatic = 1,   # Faster to link this one-time-use binary dynamically
+#      deps = (["@org_tensorflow//tensorflow/core:framework",
+#               "@org_tensorflow//tensorflow/python:python_op_gen_main"] + deps),
+#  )
+#
+#  # Invoke the previous cc_binary to generate a python file.
+#  if not out:
+#    out = "ops/gen_" + name + ".py"
+#
+#  native.genrule(
+#      name=name + "_pygenrule",
+#      outs=[out],
+#      tools=[tool_name],
+#      cmd=("$(location " + tool_name + ") " + ",".join(hidden)
+#           + " " + ("1" if require_shape_functions else "0") + " > $@"))
+#
+#  # Make a py_library out of the generated python file.
+#  native.py_library(name=name,
+#                    srcs=[out],
+#                    srcs_version="PY2AND3",
+#                    visibility=visibility,
+#                    deps=[
+#                        "@org_tensorflow//tensorflow/python:framework_for_generated_wrappers",
+#                    ],)

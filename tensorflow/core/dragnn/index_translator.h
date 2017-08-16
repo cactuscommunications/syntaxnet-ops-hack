@@ -19,8 +19,8 @@
 #include <memory>
 #include <vector>
 
-#include "dragnn/core/interfaces/component.h"
-#include "dragnn/core/interfaces/transition_state.h"
+#include "interfaces/component.h"
+#include "interfaces/transition_state.h"
 
 namespace syntaxnet {
 namespace dragnn {

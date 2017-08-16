@@ -19,7 +19,7 @@
 #include <memory>
 #include <vector>
 
-#include "syntaxnet/base.h"
+#include "tensorflow/core/syntaxnet/base.h"
 
 namespace syntaxnet {
 namespace dragnn {

@@ -22,7 +22,7 @@ limitations under the License.
 #include <vector>
 
 #include "registry.h"
-#include "sentence.pb.h"
+#include "tensorflow/core/syntaxnet/sentence.pb.h"
 #include "task_context.h"
 #include "utils.h"
 #include "tensorflow/core/lib/io/buffered_inputstream.h"

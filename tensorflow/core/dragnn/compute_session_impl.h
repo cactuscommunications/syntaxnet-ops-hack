@@ -18,13 +18,13 @@
 
 #include <memory>
 
-#include "dragnn/components/util/bulk_feature_extractor.h"
-#include "dragnn/core/compute_session.h"
-#include "dragnn/core/index_translator.h"
-#include "dragnn/core/input_batch_cache.h"
-#include "dragnn/protos/data.pb.h"
-#include "dragnn/protos/spec.pb.h"
-#include "dragnn/protos/trace.pb.h"
+#include "tensorflow/core/dragnn/components/util/bulk_feature_extractor.h"
+#include "tensorflow/core/dragnn/compute_session.h"
+#include "tensorflow/core/dragnn/index_translator.h"
+#include "tensorflow/core/dragnn/input_batch_cache.h"
+#include "tensorflow/core/dragnn/protos/data.pb.h"
+#include "tensorflow/core/dragnn/protos/spec.pb.h"
+#include "tensorflow/core/dragnn/protos/trace.pb.h"
 
 namespace syntaxnet {
 namespace dragnn {

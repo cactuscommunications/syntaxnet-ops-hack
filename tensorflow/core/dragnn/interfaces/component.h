@@ -18,12 +18,12 @@
 
 #include <vector>
 
-#include "dragnn/components/util/bulk_feature_extractor.h"
-#include "dragnn/core/input_batch_cache.h"
-#include "dragnn/core/interfaces/transition_state.h"
-#include "dragnn/protos/spec.pb.h"
-#include "dragnn/protos/trace.pb.h"
-#include "syntaxnet/registry.h"
+#include "tensorflow/core/dragnn/components/util/bulk_feature_extractor.h"
+#include "tensorflow/core/dragnn/input_batch_cache.h"
+#include "transition_state.h"
+#include "tensorflow/core/dragnn/protos/spec.pb.h"
+#include "tensorflow/core/dragnn/protos/trace.pb.h"
+#include "tensorflow/core/syntaxnet/registry.h"
 
 namespace syntaxnet {
 namespace dragnn {

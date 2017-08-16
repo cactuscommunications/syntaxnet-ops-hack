@@ -13,9 +13,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/op.h"
+#include "tensorflow/core/framework/shape_inference.h"
 
 namespace syntaxnet {
+
+using tensorflow::shape_inference::DimensionHandle;
+using tensorflow::shape_inference::InferenceContext;
+using tensorflow::shape_inference::ShapeHandle;
 
 // -----------------------------------------------------------------------------
 
@@ -28,6 +34,7 @@ REGISTER_OP("GoldParseReader")
     .Attr("batch_size: int")
     .Attr("corpus_name: string='documents'")
     .Attr("arg_prefix: string='brain_parser'")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Reads sentences, parses them, and returns (gold action, feature) pairs.
@@ -54,6 +61,7 @@ REGISTER_OP("DecodedParseReader")
     .Attr("batch_size: int")
     .Attr("corpus_name: string='documents'")
     .Attr("arg_prefix: string='brain_parser'")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Reads sentences and parses them taking parsing transitions based on the
@@ -86,6 +94,7 @@ REGISTER_OP("BeamParseReader")
     .Attr("continue_until_all_final: bool=false")
     .Attr("always_start_new_sentences: bool=false")
     .Attr("documents_from_input: bool=false")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Reads sentences and creates a beam parser.
@@ -117,6 +126,7 @@ REGISTER_OP("BeamParser")
     .Output("next_beam_state: int64")
     .Output("alive: bool")
     .Attr("feature_size: int")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Updates the beam parser based on scores in the input transition scores.
@@ -136,6 +146,7 @@ REGISTER_OP("BeamParserOutput")
     .Output("batches_and_slots: int32")
     .Output("gold_slot: int32")
     .Output("path_scores: float")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Converts the current state of the beam parser into a set of indices into
@@ -157,6 +168,7 @@ REGISTER_OP("BeamEvalOutput")
     .Input("beam_state: int64")
     .Output("eval_metrics: int32")
     .Output("documents: string")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Computes eval metrics for the best paths in the input beams.
@@ -198,6 +210,7 @@ REGISTER_OP("FeatureSize")
     .Output("embedding_dims: int32")
     .Output("num_actions: int32")
     .Attr("arg_prefix: string='brain_parser'")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 An op that returns the number and domain sizes of parser features.
 
@@ -216,6 +229,7 @@ REGISTER_OP("FeatureVocab")
     .Attr("arg_prefix: string='brain_parser'")
     .Attr("embedding_name: string='words'")
     .Output("vocab: string")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Returns the vocabulary of the parser features for a particular named channel.
 For "words" this would would be the entire vocabulary, plus any special tokens
@@ -233,6 +247,7 @@ REGISTER_OP("UnpackSyntaxNetSparseFeatures")
     .Output("indices: int32")
     .Output("ids: int64")
     .Output("weights: float")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Converts a vector of strings with SparseFeatures to tensors.
 
@@ -260,6 +275,7 @@ REGISTER_OP("WordEmbeddingInitializer")
     .Attr("embedding_init: float = 1.0")
     .Attr("seed: int = 0")
     .Attr("seed2: int = 0")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Reads word embeddings from an sstable of dist_belief.TokenEmbedding protos for
 every word specified in a text vocabulary file.
@@ -293,6 +309,7 @@ REGISTER_OP("DocumentSource")
     .Attr("corpus_name: string='documents'")
     .Attr("batch_size: int")
     .Attr("documents_from_input: bool=false")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .SetIsStateful()
     .Doc(R"doc(
 Reads documents from documents_path and outputs them.
@@ -312,6 +329,7 @@ REGISTER_OP("DocumentSink")
     .Attr("task_context: string=''")
     .Attr("task_context_str: string=''")
     .Attr("corpus_name: string='documents'")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Write documents to documents_path.
 
@@ -323,6 +341,7 @@ task_context_str: a task context in text format, used if task_context is empty.
 REGISTER_OP("SegmenterTrainingDataConstructor")
     .Input("documents: string")
     .Output("char_doc: string")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Constructs segmentation training data from documents with gold segmentation.
 
@@ -333,6 +352,7 @@ char_doc: a vector of documents as serialized protos.
 REGISTER_OP("CharTokenGenerator")
     .Input("documents: string")
     .Output("char_doc: string")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Converts token field of the input documents such that each token in the
 output doc is a utf-8 character from that doc's text.
@@ -348,6 +368,7 @@ REGISTER_OP("WellFormedFilter")
     .Attr("task_context_str: string=''")
     .Attr("corpus_name: string='documents'")
     .Attr("keep_malformed_documents: bool = False")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Removes sentences with malformed parse trees, i.e. they contain cycles.
 
@@ -364,6 +385,7 @@ REGISTER_OP("ProjectivizeFilter")
     .Attr("task_context_str: string=''")
     .Attr("corpus_name: string='documents'")
     .Attr("discard_non_projective: bool = False")
+    .SetShapeFn(tensorflow::shape_inference::UnknownShape)
     .Doc(R"doc(
 Modifies input parse trees to make them projective.
 
