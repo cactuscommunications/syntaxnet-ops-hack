@@ -512,16 +512,16 @@ cc_library(
 #    alwayslink = 1,
 #)
 
-cc_binary(
-    name = "parser_ops.so",
-    linkopts = select({
-        "//conditions:default": ["-lm"],
-        "@org_tensorflow//tensorflow:darwin": [],
-    }),
-    linkshared = 1,
-    linkstatic = 1,
-    deps = [
-        ":parser_ops_cc",
-    ],
-)
-
+#cc_binary(
+#    name = "parser_ops.so",
+#    linkopts = select({
+#        "//conditions:default": ["-lm"],
+#        "@org_tensorflow//tensorflow:darwin": [],
+#    }),
+#    linkshared = 1,
+#    linkstatic = 1,
+#    deps = [
+#        ":parser_ops_cc",
+#    ],
+#)
+#

@@ -165,7 +165,7 @@ load(
 #        "ops/dragnn_bulk_ops.cc",
 #    ],
 #    deps = [
-#        ":compute_session_op",
+#        "//tensorflow/core:compute_session_op_op_lib",
 #        ":resource_container",
 #        "//tensorflow/core/syntaxnet:base",
 #        "@org_tensorflow//third_party/eigen3",
@@ -184,7 +184,7 @@ tf_kernel_library(
     ],
     deps = [
         ":compute_session",
-        ":compute_session_op",
+        "//tensorflow/core:compute_session_op_op_lib",
         ":compute_session_pool",
         ":resource_container",
         "//tensorflow/core/dragnn/protos:spec_proto",
@@ -203,7 +203,7 @@ tf_kernel_library(
     ],
     deps = [
         ":compute_session",
-        ":compute_session_op",
+        "//tensorflow/core:compute_session_op_op_lib",
         ":compute_session_pool",
         ":resource_container",
         "//tensorflow/core/dragnn/components/util:bulk_feature_extractor",
