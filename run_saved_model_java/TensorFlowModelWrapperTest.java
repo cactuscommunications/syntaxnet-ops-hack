@@ -3,8 +3,12 @@ import org.junit.Test;
 import org.tensorflow.*;
 
 import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 import static org.junit.Assert.assertEquals;
@@ -61,8 +65,14 @@ public class TensorFlowModelWrapperTest {
 
             System.out.println("Model loaded...");
 
+
             final String[] mockdata =
-                    {"I love grapes.", "Do you even lift bro?"}; //
+                    {
+                            "I love grapes.",
+                            "Do you even lift bro?",
+                            "Does your mother known that your out?",
+                            "If you want to remove specific punctuation from a string, it will probably be best to explicitly remove exactly what you want like."
+                    }; //
 
             final StringBuffer stringBuffer = new StringBuffer();
 
@@ -71,9 +81,13 @@ public class TensorFlowModelWrapperTest {
                 stringBuffer.append('\n');
             }
 
-            final Tensor mock_input = Tensor.create(stringBuffer.toString().getBytes(StandardCharsets.UTF_8));
-            System.out.println("INPUT STRING IS:\n" + stringBuffer.toString());
+            //final String inputString = stringBuffer.toString();
+            final String inputString =
+                    readFile("/mnt/c/Users/marhl/jni_with_ops_hack/tensorflow/test_data/test_document.txt", StandardCharsets.UTF_8);
 
+
+            final Tensor mock_input = Tensor.create(inputString.getBytes(StandardCharsets.UTF_8));
+            System.out.println("INPUT STRING IS:\n" + inputString);
 
             final List<Pair<String, Tensor>> inputs = Arrays.asList(
                     new Pair<>("input", mock_input)
@@ -81,8 +95,8 @@ public class TensorFlowModelWrapperTest {
 
             final List<Tensor> outputs = rrnWrapper.runModel(inputs);
 
-            final ByteBuffer dstBuffer = ByteBuffer.allocate(1000);
-            dstBuffer.clear();
+            //final ByteBuffer dstBuffer = ByteBuffer.allocate(1000);
+            //dstBuffer.clear();
 
             for (int counter = 0; counter < outputs.size(); counter++) {
 
@@ -112,7 +126,7 @@ public class TensorFlowModelWrapperTest {
                 String string = new String(out_bytes, StandardCharsets.UTF_8);
                 System.out.println(string);
 
-                dstBuffer.clear();
+                //dstBuffer.clear();
             }
         }
     }
@@ -127,5 +141,11 @@ public class TensorFlowModelWrapperTest {
             hexChars[j * 2 + 1] = hexArray[v & 0x0F];
         }
         return new String(hexChars);
+    }
+
+    static String readFile(String path, Charset encoding)
+            throws IOException {
+        byte[] encoded = Files.readAllBytes(Paths.get(path));
+        return new String(encoded, encoding);
     }
 }

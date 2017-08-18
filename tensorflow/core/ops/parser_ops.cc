@@ -338,6 +338,21 @@ task_context: file path at which to read the task context.
 task_context_str: a task context in text format, used if task_context is empty.
 )doc");
 
+REGISTER_OP("DocumentStringSink")
+    .Input("documents: string")
+    .Output("documents_out: string")
+    .Attr("task_context: string=''")
+    .Attr("task_context_str: string=''")
+    .Attr("corpus_name: string='documents'")
+    .SetShapeFn(tensorflow::shape_inference::ScalarShape)
+    .Doc(R"doc(
+Outputs documents as a string.
+
+documents: documents to write.
+task_context: file path at which to read the task context.
+task_context_str: a task context in text format, used if task_context is empty.
+)doc");
+
 REGISTER_OP("SegmenterTrainingDataConstructor")
     .Input("documents: string")
     .Output("char_doc: string")

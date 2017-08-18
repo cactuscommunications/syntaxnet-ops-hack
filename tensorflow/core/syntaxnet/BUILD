@@ -42,6 +42,12 @@ tf_proto_library(
     srcs = ["sentence.proto"],
 )
 
+tf_proto_library(
+    name = "kbest_syntax_proto",
+    srcs = ["kbest_syntax.proto"],
+    deps = [":sentence_proto"],
+)
+
 tf_proto_library_py(
     name = "sentence_py_pb2",
     srcs = ["sentence.proto"],
@@ -55,12 +61,6 @@ tf_proto_library(
 tf_proto_library_py(
     name = "dictionary_py_pb2",
     srcs = ["dictionary.proto"],
-)
-
-tf_proto_library(
-    name = "kbest_syntax_proto",
-    srcs = ["kbest_syntax.proto"],
-    deps = [":sentence_proto"],
 )
 
 tf_proto_library(

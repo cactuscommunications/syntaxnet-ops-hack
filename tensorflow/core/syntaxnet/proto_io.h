@@ -305,6 +305,12 @@ class TextWriter {
     }
   }
 
+  string ToString(const Sentence &sentence) {
+    string key, value;
+    format_->ConvertToString(sentence, &key, &value);
+    return value;
+  }
+
  private:
   string filename_;
   std::unique_ptr<DocumentFormat> format_;

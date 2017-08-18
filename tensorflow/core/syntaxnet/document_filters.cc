@@ -196,6 +196,50 @@ class DocumentSink : public OpKernel {
 REGISTER_KERNEL_BUILDER(Name("DocumentSink").Device(DEVICE_CPU),
                         DocumentSink);
 
+class DocumentStringSink : public OpKernel {
+ public:
+  explicit DocumentStringSink(OpKernelConstruction *context) : OpKernel(context) {
+    GetTaskContext(context, &task_context_);
+    string corpus_name;
+    OP_REQUIRES_OK(context, context->GetAttr("corpus_name", &corpus_name));
+    writer_.reset(
+        new TextWriter(*task_context_.GetInput(corpus_name), &task_context_));
+  }
+
+  void Compute(OpKernelContext *context) override {
+    mutex_lock lock(mu_);
+    auto documents = context->input(0).vec<string>();
+
+    string output;
+    for (int i = 0; i < documents.size(); ++i) {
+      Sentence document;
+      OP_REQUIRES(context, document.ParseFromString(documents(i)),
+                  InvalidArgument("failed to parse sentence"));
+      auto document_string = writer_->ToString(document);
+
+      output.append(document_string);
+    }
+
+    Tensor* output_tensor = nullptr;
+    OP_REQUIRES_OK(context, context->allocate_output("documents_out", TensorShape({}),
+                                                     &output_tensor));
+    output_tensor->scalar<string>()() = output;
+  }
+
+ private:
+  // Task context used to configure this op.
+  TaskContext task_context_;
+
+  // mutex to synchronize access to Compute.
+  mutex mu_;
+
+  string documents_path_;
+  std::unique_ptr<TextWriter> writer_;
+};
+
+REGISTER_KERNEL_BUILDER(Name("DocumentStringSink").Device(DEVICE_CPU),
+                        DocumentStringSink);
+
 // Segmenter training data constructor which takes documents with gold
 // segmentation/tokenization as input and convert those docs into utf8-character
 // based token documents, where the break level of each token is used to
