@@ -356,25 +356,20 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       actual = "@six_archive//:six",
   )
 
-  patched_http_archive(
-      name = "protobuf_archive",
-      urls = [
-          "https://github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
-          "http://mirror.bazel.build/github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
-      ],
-      sha256 = "6d43b9d223ce09e5d4ce8b0060cb8a7513577a35a64c7e3dad10f0703bf3ad93",
-      strip_prefix = "protobuf-0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66",
-      # TODO: remove patching when tensorflow stops linking same protos into
-      #       multiple shared libraries loaded in runtime by python.
-      #       This patch fixes a runtime crash when tensorflow is compiled
-      #       with clang -O2 on Linux (see https://github.com/tensorflow/tensorflow/issues/8394)
-      patch_file = str(Label("//third_party/protobuf:add_noinlines.patch")),
-  )
-
-  native.bind(
-      name = "protobuf",
-      actual = "@protobuf_archive//:protobuf",
-  )
+  #patched_http_archive(
+  #    name = "protobuf_archive",
+  #    urls = [
+  #        "https://github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
+  #        "http://mirror.bazel.build/github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
+  #    ],
+  #    sha256 = "6d43b9d223ce09e5d4ce8b0060cb8a7513577a35a64c7e3dad10f0703bf3ad93",
+  #    strip_prefix = "protobuf-0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66",
+  #    # TODO: remove patching when tensorflow stops linking same protos into
+  #    #       multiple shared libraries loaded in runtime by python.
+  #    #       This patch fixes a runtime crash when tensorflow is compiled
+  #    #       with clang -O2 on Linux (see https://github.com/tensorflow/tensorflow/issues/8394)
+  #    patch_file = str(Label("//third_party/protobuf:add_noinlines.patch")),
+  #)
 
   # We need to import the protobuf library under the names com_google_protobuf
   # and com_google_protobuf_cc to enable proto_library support in bazel.
@@ -387,6 +382,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       ],
       sha256 = "6d43b9d223ce09e5d4ce8b0060cb8a7513577a35a64c7e3dad10f0703bf3ad93",
       strip_prefix = "protobuf-0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66",
+  )
+
+  native.bind(
+      name = "protobuf",
+      actual = "@com_google_protobuf//:protobuf",
   )
 
   native.http_archive(
