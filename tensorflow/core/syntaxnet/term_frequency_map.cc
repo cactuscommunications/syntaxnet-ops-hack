@@ -98,8 +98,8 @@ void TermFrequencyMap::Load(const string &filename, int min_frequency,
     term_data_.push_back(std::pair<string, int64>(term, frequency));
   }
   CHECK_EQ(term_index_.size(), term_data_.size());
-  LOG(INFO) << "Loaded " << term_index_.size() << " terms from " << filename
-            << ".";
+  //LOG(INFO) << "Loaded " << term_index_.size() << " terms from " << filename
+  //          << ".";
 }
 
 struct TermFrequencyMap::SortByFrequencyThenTerm {

@@ -94,6 +94,7 @@ class DocumentSource : public OpKernel {
 
   void Compute(OpKernelContext *context) override {
     mutex_lock lock(mu_);
+
     Sentence *document;
     vector<Sentence *> document_batch;
 
@@ -106,14 +107,14 @@ class DocumentSource : public OpKernel {
 		  InvalidArgument("input should be a vector."));
 
       std::unique_ptr<std::vector<std::string>>
-	strings(new std::vector<std::string>);
+	    strings(new std::vector<std::string>);
 
       TTypes< string >::ConstFlat input_vec = input.flat<string>();
       const int64 n = input.NumElements();
 
       for (int64 i = 0; i < n; i++) {
-	strings->push_back(input_vec(i));
-        LOG(INFO) << "text: " << input_vec(i);
+	     strings->push_back(input_vec(i));
+        //LOG(INFO) << "text: " << input_vec(i);
       }
 
       vec_reader.reset(new TextReader(*task_context_.GetInput(corpus_name_), &task_context_,
@@ -208,6 +209,7 @@ class DocumentStringSink : public OpKernel {
 
   void Compute(OpKernelContext *context) override {
     mutex_lock lock(mu_);
+
     auto documents = context->input(0).vec<string>();
 
     string output;
@@ -217,12 +219,13 @@ class DocumentStringSink : public OpKernel {
                   InvalidArgument("failed to parse sentence"));
       auto document_string = writer_->ToString(document);
 
-      output.append(document_string);
+      output.append(*document_string);
     }
 
     Tensor* output_tensor = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output("documents_out", TensorShape({}),
                                                      &output_tensor));
+
     output_tensor->scalar<string>()() = output;
   }
 

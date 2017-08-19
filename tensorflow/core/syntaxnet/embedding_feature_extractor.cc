@@ -32,9 +32,9 @@ void GenericEmbeddingFeatureExtractor::Setup(TaskContext *context) {
       context->Get(GetParamName("embedding_names"), "");
   const string embedding_dims =
       context->Get(GetParamName("embedding_dims"), "");
-  LOG(INFO) << "Features: " << features;
-  LOG(INFO) << "Embedding names: " << embedding_names;
-  LOG(INFO) << "Embedding dims: " << embedding_dims;
+  //LOG(INFO) << "Features: " << features;
+  //LOG(INFO) << "Embedding names: " << embedding_names;
+  //LOG(INFO) << "Embedding dims: " << embedding_dims;
   embedding_fml_ = utils::Split(features, ';');
   add_strings_ = context->Get(GetParamName("add_varlen_strings"), false);
   embedding_names_ = utils::Split(embedding_names, ';');

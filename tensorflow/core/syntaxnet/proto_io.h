@@ -157,7 +157,7 @@ class VectorIn : public tensorflow::RandomAccessFile {
     if (!eof_) {
       string line;
       eof_ = !getline(line);
-      LOG(INFO) << "VectorIn: " << line;
+      //LOG(INFO) << "VectorIn: " << line;
       buffer_.append(line);
       buffer_.append("\n");
     }
@@ -180,7 +180,7 @@ class VectorIn : public tensorflow::RandomAccessFile {
 
   bool getline(string &line) const {
     if (index_ < vec_->size()) {
-      LOG(INFO) << "VectorIn::getline index=" << index_ << " value=" << (*vec_)[index_];
+      //LOG(INFO) << "VectorIn::getline index=" << index_ << " value=" << (*vec_)[index_];
       line = (*vec_)[index_++];
       return true;
     }
@@ -239,11 +239,11 @@ class TextReader {
   void Reset() {
     sentence_count_ = 0;
     if (feed_text_ != nullptr) {
-      static const int kInputBufferSize = 8 * 1024; /* bytes */
+      static const int kInputBufferSize = 1024 * 1024; /* bytes */
       file_.reset(new VectorIn(std::move(feed_text_)));
       buffer_.reset(new tensorflow::io::BufferedInputStream(file_.get(), kInputBufferSize));
     } else if (filename_ == "-") {
-      static const int kInputBufferSize = 8 * 1024; /* bytes */
+      static const int kInputBufferSize = 1024 * 1024; /* bytes */
       file_.reset(new StdIn());
       stream_.reset(new tensorflow::io::RandomAccessInputStream(file_.get()));
       buffer_.reset(new tensorflow::io::BufferedInputStream(file_.get(),
@@ -305,10 +305,11 @@ class TextWriter {
     }
   }
 
-  string ToString(const Sentence &sentence) {
-    string key, value;
-    format_->ConvertToString(sentence, &key, &value);
-    return value;
+  std::unique_ptr<string> ToString(const Sentence &sentence) {
+    string key;
+    std::unique_ptr<string> value(new string);
+    format_->ConvertToString(sentence, &key, value.get());
+    return std::move(value);
   }
 
  private:
