@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-public abstract class TensorflowModelWrapper<InputType> implements AutoCloseable {
+public abstract class TensorflowModelWrapper<IN, OUT> implements AutoCloseable {
 
     private final SavedModelBundle bundle;
     protected final List<String> outputOpNames;
@@ -24,10 +24,10 @@ public abstract class TensorflowModelWrapper<InputType> implements AutoCloseable
         return bundle.graph();
     }
 
-    protected abstract List<Tensor> runModelImpl(final List<Pair<String, Tensor>> inputs, final SavedModelBundle bundle);
+    protected abstract OUT runModelImpl(final IN inputs, final SavedModelBundle bundle);
 
-    public final List<Tensor> runModel(final List<Pair<String, Tensor>> inputs) {
-        return runModelImpl(inputs, bundle);
+    public final OUT runModel(final IN input) {
+        return runModelImpl(input, bundle);
     }
 
     @Override
@@ -37,7 +37,7 @@ public abstract class TensorflowModelWrapper<InputType> implements AutoCloseable
         }
     }
 
-    public static class TensorflowModelWrapperException extends IllegalArgumentException {
+    protected static class TensorflowModelWrapperException extends IllegalArgumentException {
         public TensorflowModelWrapperException(final String message, final Throwable cause) {
             super(message, cause);
         }
