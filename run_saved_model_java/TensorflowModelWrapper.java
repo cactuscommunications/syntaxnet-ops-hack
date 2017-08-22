@@ -1,8 +1,6 @@
-import javafx.util.Pair;
 import org.tensorflow.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 public abstract class TensorflowModelWrapper<IN, OUT> implements AutoCloseable {
@@ -24,10 +22,10 @@ public abstract class TensorflowModelWrapper<IN, OUT> implements AutoCloseable {
         return bundle.graph();
     }
 
-    protected abstract OUT runModelImpl(final IN inputs, final SavedModelBundle bundle);
+    protected abstract OUT runModelImpl(final IN inputs, final Session session);
 
     public final OUT runModel(final IN input) {
-        return runModelImpl(input, bundle);
+        return runModelImpl(input, bundle.session());
     }
 
     @Override

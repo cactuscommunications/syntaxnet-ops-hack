@@ -1,9 +1,10 @@
-import org.tensorflow.SavedModelBundle;
+import com.google.common.base.Splitter;
 import org.tensorflow.Session;
 import org.tensorflow.Tensor;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+
 
 public class ParseyMcParsefaceWrapper extends TensorflowModelWrapper<String, String> {
 
@@ -11,30 +12,45 @@ public class ParseyMcParsefaceWrapper extends TensorflowModelWrapper<String, Str
         super(savedModelDir, Arrays.asList("output"));
     }
 
+    /**
+     * @param input   a string of newline separated sentences
+     * @param session a saved model bundle
+     * @return
+     */
     @Override
-    protected String runModelImpl(final String input, final SavedModelBundle bundle) {
+    protected String runModelImpl(final String input, final Session session) {
+
+        final int ONE_MB = 1024 * 1024;
+        final Splitter splitter = Splitter.fixedLength(ONE_MB);
 
         // User information...
         System.out.println("Fetching session...");
 
         // Retrieve runner from session
-        final Session.Runner runner = bundle.session().runner();
+        final Session.Runner runner = session.runner();
 
-        // Create input Tensor from String input
-        final Tensor inputTensor = Tensor.create(input.getBytes(StandardCharsets.UTF_8));
+        final StringBuilder outputBuilder = new StringBuilder();
 
-        // Feed all inputs to the graph
-        runner.feed("input", inputTensor);
+        for (String substring : splitter.splitToList(input)) {
 
-        // Fetch all graph outputs
-        final Tensor outputTensor = runner.fetch(this.outputOpNames.get(0)).run().get(0);
+            // Create input Tensor from String input
+            final Tensor inputTensor = Tensor.create(substring.getBytes(StandardCharsets.UTF_8));
 
-        // Fetch output bytes from tensor:
-        final byte[] outputBytes = outputTensor.bytesValue();
+            // Feed all inputs to the graph
+            runner.feed("input", inputTensor);
 
-        // Decode bytes to String
-        final String output = new String(outputBytes, StandardCharsets.UTF_8);
+            // Fetch all graph outputs
+            final Tensor outputTensor = runner.fetch(this.outputOpNames.get(0)).run().get(0);
 
-        return output;
+            // Fetch output bytes from tensor:
+            final byte[] outputBytes = outputTensor.bytesValue();
+
+            // Decode bytes to String
+            final String output = new String(outputBytes, StandardCharsets.UTF_8);
+
+            outputBuilder.append(output);
+        }
+
+        return outputBuilder.toString();
     }
 }

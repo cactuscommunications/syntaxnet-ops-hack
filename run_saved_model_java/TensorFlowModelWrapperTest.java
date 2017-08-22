@@ -1,13 +1,10 @@
-import javafx.util.Pair;
 import org.junit.Test;
-import org.tensorflow.*;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
 
 public class TensorFlowModelWrapperTest {
 
@@ -18,6 +15,8 @@ public class TensorFlowModelWrapperTest {
     public void testSyntaxnet() throws Exception {
 
         System.out.println("Loading model....");
+
+        final String output;
 
         try (final ParseyMcParsefaceWrapper rrnWrapper =
                      new ParseyMcParsefaceWrapper(
@@ -44,9 +43,10 @@ public class TensorFlowModelWrapperTest {
             final String inputString =
                     readFile("/mnt/c/Users/marhl/jni_with_ops_hack/tensorflow/test_data/test_document.txt", StandardCharsets.UTF_8);
 
-            final String output = rrnWrapper.runModel(inputString);
-            //System.out.println(output);
+            output = rrnWrapper.runModel(inputString);
         }
+
+        System.out.println(output);
     }
 
     private static String readFile(final String path, final Charset encoding)
