@@ -229,7 +229,6 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       name = "gemmlowp",
       urls = [
           "http://mirror.bazel.build/github.com/google/gemmlowp/archive/a6f29d8ac48d63293f845f2253eccbf86bc28321.tar.gz",
-          "https://github.com/google/gemmlowp/archive/a6f29d8ac48d63293f845f2253eccbf86bc28321.tar.gz",
       ],
       sha256 = "75d40ea8e68b0d1644f052fffe8f14a410b2a73d40ccb859a95c0578d194ec26",
       strip_prefix = "gemmlowp-a6f29d8ac48d63293f845f2253eccbf86bc28321",
@@ -356,20 +355,19 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       actual = "@six_archive//:six",
   )
 
-  #patched_http_archive(
-  #    name = "protobuf_archive",
-  #    urls = [
-  #        "https://github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
-  #        "http://mirror.bazel.build/github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
-  #    ],
-  #    sha256 = "6d43b9d223ce09e5d4ce8b0060cb8a7513577a35a64c7e3dad10f0703bf3ad93",
-  #    strip_prefix = "protobuf-0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66",
-  #    # TODO: remove patching when tensorflow stops linking same protos into
-  #    #       multiple shared libraries loaded in runtime by python.
-  #    #       This patch fixes a runtime crash when tensorflow is compiled
-  #    #       with clang -O2 on Linux (see https://github.com/tensorflow/tensorflow/issues/8394)
-  #    patch_file = str(Label("//third_party/protobuf:add_noinlines.patch")),
-  #)
+  patched_http_archive(
+      name = "protobuf",
+      urls = [
+          "http://mirror.bazel.build/github.com/google/protobuf/archive/0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66.tar.gz",
+      ],
+      sha256 = "6d43b9d223ce09e5d4ce8b0060cb8a7513577a35a64c7e3dad10f0703bf3ad93",
+      strip_prefix = "protobuf-0b059a3d8a8f8aa40dde7bea55edca4ec5dfea66",
+      # TODO: remove patching when tensorflow stops linking same protos into
+      #       multiple shared libraries loaded in runtime by python.
+      #       This patch fixes a runtime crash when tensorflow is compiled
+      #       with clang -O2 on Linux (see https://github.com/tensorflow/tensorflow/issues/8394)
+      patch_file = str(Label("//third_party/protobuf:add_noinlines.patch")),
+  )
 
   # We need to import the protobuf library under the names com_google_protobuf
   # and com_google_protobuf_cc to enable proto_library support in bazel.
@@ -528,11 +526,10 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   temp_workaround_http_archive(
       name = "llvm",
       urls = [
-          "http://mirror.bazel.build/github.com/llvm-mirror/llvm/archive/9aafb854cc7cb8df8338c50cb411a54ce1e09796.tar.gz",
-          "https://github.com/llvm-mirror/llvm/archive/9aafb854cc7cb8df8338c50cb411a54ce1e09796.tar.gz",
+          "http://mirror.bazel.build/github.com/llvm-mirror/llvm/archive/9889fe2290766430b99a2d4fadbc5ba92f8004b6.tar.gz",
       ],
-      sha256 = "2a6d4c23f6660d9130d8d5f16267db53a87f8d0104f9618b558c033570f110af",
-      strip_prefix = "llvm-9aafb854cc7cb8df8338c50cb411a54ce1e09796",
+      sha256 = "a8da6d42ac7419e543a27e405f8b660f7b065e9ba981cc9cdcdcecb81af9cc43",
+      strip_prefix = "llvm-9889fe2290766430b99a2d4fadbc5ba92f8004b6",
       build_file = str(Label("//third_party/llvm:llvm.BUILD")),
       repository = tf_repo_name,
   )
@@ -679,7 +676,6 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       name = "cub_archive",
       urls = [
           "http://mirror.bazel.build/github.com/NVlabs/cub/archive/1.6.4.zip",
-          "https://github.com/NVlabs/cub/archive/1.6.4.zip",
       ],
       sha256 = "966d0c4f41e2bdc81aebf9ccfbf0baffaac5a74f00b826b06f4dee79b2bb8cee",
       strip_prefix = "cub-1.6.4",
