@@ -25,6 +25,7 @@ from tensorflow.core.protobuf import config_pb2
 from tensorflow.python.client import session
 from tensorflow.python.debug.cli import cli_shared
 from tensorflow.python.debug.cli import debugger_cli_common
+from tensorflow.python.debug.cli import ui_factory
 from tensorflow.python.debug.wrappers import local_cli_wrapper
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
@@ -40,6 +41,7 @@ from tensorflow.python.ops import sparse_ops
 from tensorflow.python.ops import state_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import googletest
+from tensorflow.python.training import monitored_session
 
 
 class LocalCLIDebuggerWrapperSessionForTest(
@@ -98,6 +100,9 @@ class LocalCLIDebuggerWrapperSessionForTest(
       self.observers["run_start_cli_run_numbers"].append(self._run_call_count)
     else:
       self.observers["run_end_cli_run_numbers"].append(self._run_call_count)
+
+    readline_cli = ui_factory.get_ui("readline")
+    self._register_this_run_info(readline_cli)
 
     while True:
       command = self._command_sequence[self._command_pointer]
@@ -421,6 +426,10 @@ class LocalCLIDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     def v_greater_than_twelve(datum, tensor):
       return datum.node_name == "v" and tensor > 12.0
 
+    # Verify that adding the same tensor filter more than once is tolerated
+    # (i.e., as if it were added only once).
+    wrapped_sess.add_tensor_filter("v_greater_than_twelve",
+                                   v_greater_than_twelve)
     wrapped_sess.add_tensor_filter("v_greater_than_twelve",
                                    v_greater_than_twelve)
 
@@ -441,6 +450,46 @@ class LocalCLIDebugWrapperSessionTest(test_util.TensorFlowTestCase):
 
     self.assertEqual(2, len(wrapped_sess.observers["debug_dumps"]))
     self.assertEqual([None, None], wrapped_sess.observers["tf_errors"])
+
+  def testRunTillFilterPassesWorksInConjunctionWithOtherNodeNameFilter(self):
+    """Test that --.*_filter flags work in conjunction with -f.
+
+    In other words, test that you can use a tensor filter on a subset of
+    the tensors.
+    """
+    wrapped_sess = LocalCLIDebuggerWrapperSessionForTest(
+        [["run", "-f", "v_greater_than_twelve", "--node_name_filter", "v$"],
+         ["run", "-f", "v_greater_than_twelve", "--node_name_filter", "v$"],
+         ["run"]],
+        self.sess,
+        dump_root=self._tmp_dir)
+
+    def v_greater_than_twelve(datum, tensor):
+      return datum.node_name == "v" and tensor > 12.0
+    wrapped_sess.add_tensor_filter("v_greater_than_twelve",
+                                   v_greater_than_twelve)
+
+    # run five times.
+    wrapped_sess.run(self.inc_v)
+    wrapped_sess.run(self.inc_v)
+    wrapped_sess.run(self.inc_v)
+    wrapped_sess.run(self.inc_v)
+    wrapped_sess.run(self.inc_v)
+
+    self.assertAllClose(15.0, self.sess.run(self.v))
+
+    self.assertEqual([1], wrapped_sess.observers["run_start_cli_run_numbers"])
+
+    # run-end CLI should NOT have been launched for run #2 and #3, because only
+    # starting from run #4 v becomes greater than 12.0.
+    self.assertEqual([4, 5], wrapped_sess.observers["run_end_cli_run_numbers"])
+
+    debug_dumps = wrapped_sess.observers["debug_dumps"]
+    self.assertEqual(2, len(debug_dumps))
+    self.assertEqual(1, len(debug_dumps[0].dumped_tensor_data))
+    self.assertEqual("v:0", debug_dumps[0].dumped_tensor_data[0].tensor_name)
+    self.assertEqual(1, len(debug_dumps[1].dumped_tensor_data))
+    self.assertEqual("v:0", debug_dumps[1].dumped_tensor_data[0].tensor_name)
 
   def testRunsUnderDebugModeWithWatchFnFilteringNodeNames(self):
     wrapped_sess = LocalCLIDebuggerWrapperSessionForTest(
@@ -600,6 +649,20 @@ class LocalCLIDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     wrapped_sess = LocalCLIDebuggerWrapperSessionForTest(
         [["run"], ["run"]], self.sess)
     del wrapped_sess
+
+  def testCallingShouldStopMethodOnNonWrappedNonMonitoredSessionErrors(self):
+    wrapped_sess = LocalCLIDebuggerWrapperSessionForTest(
+        [["run"], ["run"]], self.sess)
+    with self.assertRaisesRegexp(
+        ValueError,
+        r"The wrapped session .* does not have a method .*should_stop.*"):
+      wrapped_sess.should_stop()
+
+  def testLocalCLIDebugWrapperSessionWorksOnMonitoredSession(self):
+    monitored_sess = monitored_session.MonitoredSession()
+    wrapped_monitored_sess = LocalCLIDebuggerWrapperSessionForTest(
+        [["run"], ["run"]], monitored_sess)
+    self.assertFalse(wrapped_monitored_sess.should_stop())
 
 
 if __name__ == "__main__":

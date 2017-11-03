@@ -785,6 +785,17 @@ XLA_TEST_F(ArrayElementwiseOpTest, PowF32s) {
       &builder, {16.0f, 0.25f, 8.0f, NAN, NAN, -8.0f, 16.0f}, {}, error_spec_);
 }
 
+XLA_TEST_F(ArrayElementwiseOpTest, PowNonIntegerF32s) {
+  SetFastMathDisabled(true);
+  ComputationBuilder builder(client_, TestName());
+  auto lhs = builder.ConstantR1<float>({-2.0f, -0.6f, -0.6f, 0.0f});
+  auto rhs = builder.ConstantR1<float>({0.5f, 0.6f, -0.6f, -0.6f});
+  auto minimum = builder.Pow(lhs, rhs);
+
+  ComputeAndCompareR1<float>(&builder, {NAN, NAN, NAN, INFINITY}, {},
+                             error_spec_);
+}
+
 XLA_TEST_F(ArrayElementwiseOpTest, PowZeroElementF32s) {
   ComputationBuilder builder(client_, TestName());
   auto lhs = builder.ConstantR1<float>({});
@@ -2129,6 +2140,33 @@ XLA_TEST_F(ArrayElementwiseOpTest, CannotAddOpaques) {
   EXPECT_THAT(computation_status.status().ToString(),
               ::testing::ContainsRegex(
                   "Expected non-opaque argument for lhs of binary operation"));
+}
+
+XLA_TEST_F(ArrayElementwiseOpTest, IdentityBroadcastOfSameRankIsAllowed) {
+  ComputationBuilder builder(client_, TestName());
+  auto a =
+      builder.ConstantR2<float>({{-2.5f, 3.14f, 1.0f}, {2.25f, -10.0f, 3.33f}});
+  auto b =
+      builder.ConstantR2<float>({{-1.5f, 8.14f, 42.0}, {-1.0f, -4.0f, 5.55f}});
+  auto add = builder.Add(a, b, /*broadcast_dimensions=*/{0, 1});
+
+  Array2D<float> expected_array(
+      {{-4.0f, 11.28f, 43.0f}, {1.25f, -14.0f, 8.88f}});
+  ComputeAndCompareR2<float>(&builder, expected_array, {}, error_spec_);
+}
+
+XLA_TEST_F(ArrayElementwiseOpTest, NonIdentityBroadcastOfSameRankIsDisallowed) {
+  ComputationBuilder builder(client_, TestName());
+  auto a =
+      builder.ConstantR2<float>({{-2.5f, 3.14f, 1.0f}, {2.25f, -10.0f, 3.33f}});
+  auto b =
+      builder.ConstantR2<float>({{-1.5f, 8.14f, 42.0}, {-1.0f, -4.0f, 5.55f}});
+  auto add = builder.Add(a, b, /*broadcast_dimensions=*/{1, 0});
+
+  StatusOr<Computation> computation_status = builder.Build();
+  ASSERT_FALSE(computation_status.ok());
+  EXPECT_THAT(computation_status.status().error_message(),
+              ::testing::ContainsRegex("must.*be the identity"));
 }
 
 // Regression test for b/31927799. "slice - y" is fused and requires implicit

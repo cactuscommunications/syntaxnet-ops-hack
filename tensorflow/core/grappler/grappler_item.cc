@@ -32,6 +32,9 @@ GrapplerItem::GrapplerItem(const GrapplerItem& other, GraphDef&& graphDef) {
   fetch = other.fetch;
   init_ops = other.init_ops;
   expected_init_time = other.expected_init_time;
+  save_op = other.save_op;
+  restore_op = other.restore_op;
+  save_restore_loc_tensor = other.save_restore_loc_tensor;
   queue_runners = other.queue_runners;
   graph.Swap(&graphDef);
 }
@@ -63,6 +66,41 @@ std::vector<const NodeDef*> GrapplerItem::MainVariables() const {
     }
   }
   return vars;
+}
+
+std::unordered_set<string> GrapplerItem::NodesToPreserve() const {
+  std::unordered_set<string> result;
+  for (const string& f : fetch) {
+    result.insert(NodeName(f));
+  }
+  for (const auto& f : feed) {
+    result.insert(NodeName(f.first));
+  }
+  for (const auto& node : init_ops) {
+    result.insert(NodeName(node));
+  }
+  if (!save_op.empty()) {
+    result.insert(NodeName(save_op));
+  }
+  if (!restore_op.empty()) {
+    result.insert(NodeName(restore_op));
+  }
+  if (!save_restore_loc_tensor.empty()) {
+    result.insert(NodeName(save_restore_loc_tensor));
+  }
+
+  for (const auto& queue_runner : queue_runners) {
+    for (const string& enqueue_op : queue_runner.enqueue_op_name()) {
+      result.insert(NodeName(enqueue_op));
+    }
+    if (!queue_runner.close_op_name().empty()) {
+      result.insert(NodeName(queue_runner.close_op_name()));
+    }
+    if (!queue_runner.cancel_op_name().empty()) {
+      result.insert(NodeName(queue_runner.cancel_op_name()));
+    }
+  }
+  return result;
 }
 
 std::vector<const NodeDef*> ComputeTransitiveFanin(

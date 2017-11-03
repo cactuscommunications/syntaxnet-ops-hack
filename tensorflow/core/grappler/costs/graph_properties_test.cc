@@ -345,6 +345,15 @@ TEST_F(GraphPropertiesTest, MergeWithoutLoops) {
     EXPECT_EQ(DT_FLOAT, prop.dtype());
     EXPECT_EQ(expected_outputs[i], PropToString(prop));
   }
+
+  // The "Less" node should be fed by 2 int32 scalar constant values.
+  const auto props = properties.GetInputProperties("Less");
+  EXPECT_EQ(2, props.size());
+  for (int i = 0; i < props.size(); ++i) {
+    EXPECT_EQ(DT_INT32, props[i].dtype());
+    EXPECT_TRUE(props[i].has_value());
+    EXPECT_EQ("int32: []", PropToString(props[i]));
+  }
 }
 
 TEST_F(GraphPropertiesTest, WhileLoop) {
@@ -501,6 +510,64 @@ TEST_F(GraphPropertiesTest, LoopsAndQueues) {
   }
 }
 
+TEST_F(GraphPropertiesTest, LoopsAndResourceVars) {
+  // Test graph produced in python using:
+  /*
+    with tf.Graph().as_default():
+      i0 = tf.constant(0)
+      with tf.variable_scope(VariableScope(reuse=None, use_resource=True)):
+        v = tf.get_variable(initializer=i0, name='loop_var')
+
+      def inner(j, y):
+        def inner_cond(j, y):
+          return j < 3
+
+        def inner_body(j, y):
+          return j + 1, y + y
+
+        return tf.while_loop(inner_cond, inner_body, loop_vars=[j, y])
+
+      def outer_cond(i, x):
+        return i < 3
+
+      def outer_body(i, x):
+        y = x + x
+        inner(0, v)
+        return i + 1, y
+
+      v, z = tf.while_loop(outer_cond, outer_body,
+                           loop_vars=[v, tf.constant(1)])
+
+      with open('/tmp/graph.pbtxt', 'w') as f:
+        f.write(str(tf.get_default_graph().as_graph_def()))
+  */
+
+  GrapplerItem item;
+  string filename = io::JoinPath(testing::TensorFlowSrcRoot(), kTestDataPath,
+                                 "loops_and_resource_vars.pbtxt");
+  TF_CHECK_OK(ReadGraphDefFromFile(filename, &item.graph));
+  GraphProperties properties(item);
+  TF_CHECK_OK(properties.InferStatically());
+
+  std::vector<string> outer_nodes{"while/Merge_1", "while/NextIteration_1",
+                                  "while/Exit_1"};
+  std::vector<string> inner_nodes{"while/while/Merge_1",
+                                  "while/while/NextIteration_1",
+                                  "while/while/Exit_1"};
+  for (const string& node : outer_nodes) {
+    const auto props = properties.GetOutputProperties(node);
+    const OpInfo::TensorProperties& prop = props[0];
+    EXPECT_EQ(DT_INT32, prop.dtype());
+    EXPECT_EQ("int32: []", PropToString(prop));
+  }
+  for (const string& node : inner_nodes) {
+    const auto props = properties.GetOutputProperties(node);
+    const OpInfo::TensorProperties& prop = props[0];
+    EXPECT_EQ(DT_INT32, prop.dtype());
+    EXPECT_EQ("int32: []", PropToString(prop));
+  }
+}
+
 TEST_F(GraphPropertiesTest, QueuesAndLoops) {
   // Test graph produced in python using:
   /*
@@ -548,6 +615,92 @@ TEST_F(GraphPropertiesTest, QueuesAndLoops) {
   const OpInfo::TensorProperties& prop = props[0];
   EXPECT_EQ(DT_FLOAT, prop.dtype());
   EXPECT_EQ("float: [-1,4]", PropToString(prop));
+}
+
+TEST_F(GraphPropertiesTest, InferRestoreOpShape) {
+  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+  Output var = ops::Variable(s.WithOpName("var"), TensorShape({128, 256}),
+                             DataType::DT_FLOAT);
+  Output filename =
+      ops::Const(s.WithOpName("filename"), string("model"), TensorShape());
+  Output tensor_name =
+      ops::Const(s.WithOpName("tensorname"), string("a"), TensorShape());
+  Output restore = ops::Restore(s.WithOpName("restore"), filename, tensor_name,
+                                DataType::DT_FLOAT);
+  Output init_restore = ops::Assign(s.WithOpName("init_restore"), var, restore);
+
+  Output shape_and_slice = ops::Const(s.WithOpName("shape_and_slice"),
+                                      string("256 256 0,128:-"), TensorShape());
+  Output restore_slice =
+      ops::RestoreSlice(s.WithOpName("restore_slice"), filename, tensor_name,
+                        shape_and_slice, DataType::DT_FLOAT);
+  Output init_restore_slice =
+      ops::Assign(s.WithOpName("init_restore_slice"), var, restore_slice);
+
+  Output restore_v2 =
+      ops::RestoreSlice(s.WithOpName("restore_v2"), filename, tensor_name,
+                        shape_and_slice, DataType::DT_FLOAT);
+  Output init_restore_v2 =
+      ops::Assign(s.WithOpName("init_restore_v2"), var, restore_v2);
+
+  GrapplerItem item;
+  TF_CHECK_OK(s.ToGraphDef(&item.graph));
+  item.fetch.push_back("init_restore");
+
+  GraphProperties properties(item);
+  TF_CHECK_OK(properties.InferStatically());
+
+  const auto restore_props = properties.GetOutputProperties("restore");
+  const OpInfo::TensorProperties& restore_prop = restore_props[0];
+  EXPECT_EQ(DT_FLOAT, restore_prop.dtype());
+  EXPECT_EQ("float: [128,256]", PropToString(restore_prop));
+
+  const auto restore_slice_props =
+      properties.GetOutputProperties("restore_slice");
+  const OpInfo::TensorProperties& restore_slice_prop = restore_slice_props[0];
+  EXPECT_EQ(DT_FLOAT, restore_slice_prop.dtype());
+  EXPECT_EQ("float: [128,256]", PropToString(restore_slice_prop));
+
+  const auto restorev2_props = properties.GetOutputProperties("restore_v2");
+  const OpInfo::TensorProperties& restorev2_prop = restorev2_props[0];
+  EXPECT_EQ(DT_FLOAT, restorev2_prop.dtype());
+  EXPECT_EQ("float: [128,256]", PropToString(restorev2_prop));
+
+  // Check input shapes of assign op are propagted correctly.
+  const auto input_props = properties.GetInputProperties("init_restore");
+  ASSERT_EQ(2, input_props.size());
+  const OpInfo::TensorProperties& input_prop = input_props[1];
+  EXPECT_EQ(DT_FLOAT, input_prop.dtype());
+  EXPECT_EQ("float: [128,256]", PropToString(input_prop));
+}
+
+TEST_F(GraphPropertiesTest, InferRestoreOpShape_WithTwoNodesShareSameOutput) {
+  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+  Output var =
+      ops::Variable(s.WithOpName("var"), TensorShape(), DataType::DT_FLOAT);
+  Output var2 = ops::Variable(s.WithOpName("var2"), TensorShape({128, 256}),
+                              DataType::DT_FLOAT);
+  Output filename =
+      ops::Const(s.WithOpName("filename"), string("model"), TensorShape());
+  Output tensor_name =
+      ops::Const(s.WithOpName("tensorname"), string("a"), TensorShape());
+  Output restore = ops::Restore(s.WithOpName("restore"), filename, tensor_name,
+                                DataType::DT_FLOAT);
+  Output init = ops::Assign(s.WithOpName("init"), var, restore);
+  Output init2 = ops::Assign(s.WithOpName("init2"), var2, restore);
+
+  GrapplerItem item;
+  TF_CHECK_OK(s.ToGraphDef(&item.graph));
+  item.fetch.push_back("init");
+  item.fetch.push_back("init2");
+
+  GraphProperties properties(item);
+  TF_CHECK_OK(properties.InferStatically());
+
+  const auto props = properties.GetOutputProperties("restore");
+  const OpInfo::TensorProperties& prop = props[0];
+  EXPECT_EQ(DT_FLOAT, prop.dtype());
+  EXPECT_EQ("float: [128,256]", PropToString(prop));
 }
 
 }  // namespace
