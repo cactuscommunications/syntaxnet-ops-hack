@@ -53,7 +53,7 @@ def tf_proto_library(name, srcs=[], has_services=False,
                    deps=deps,
                    cc_libs = ["@com_google_protobuf//:protobuf"],
                    protoc="@com_google_protobuf//:protoc",
-                   default_runtime="@com_google_protobuf//:protobuf",
+                   #default_runtime="@com_google_protobuf//:protobuf",
                    testonly=testonly,
                    visibility=visibility,)
 
@@ -62,7 +62,7 @@ def tf_proto_library_py(name, srcs=[], deps=[], visibility=None, testonly=0):
                    srcs=srcs,
                    srcs_version = "PY2AND3",
                    deps=deps,
-                   default_runtime="@com_google_protobuf//:protobuf_python",
+                   #default_runtime="@com_google_protobuf//:protobuf_python",
                    protoc="@com_google_protobuf//:protoc",
                    visibility=visibility,
                    testonly=testonly,)

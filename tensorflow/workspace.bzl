@@ -382,7 +382,7 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   # TODO(gunan): Add github mirror back if/when sha256sum issues are resolved.
   #   See https://github.com/libgit2/libgit2/issues/4343 for contetxt.
   patched_http_archive(
-      name = "protobuf",
+      name = "protobuf_archive",
       urls = [
           "http://mirror.bazel.build/github.com/google/protobuf/archive/b04e5cba356212e4e8c66c61bbe0c3a20537c5b9.tar.gz",
       ],
@@ -393,6 +393,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       #       This patch fixes a runtime crash when tensorflow is compiled
       #       with clang -O2 on Linux (see https://github.com/tensorflow/tensorflow/issues/8394)
       patch_file = str(Label("//third_party/protobuf:add_noinlines.patch")),
+  )
+
+  native.bind(
+      name = "protobuf",
+      actual = "@protobuf_archive//:protobuf",
   )
 
   # We need to import the protobuf library under the names com_google_protobuf
@@ -492,7 +497,7 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   # to point to the protobuf's compiler library.
   native.bind(
       name = "protobuf_clib",
-      actual = "@com_google_protobuf//:protoc_lib",
+      actual = "@protobuf_archive//:protoc_lib",
   )
 
   native.bind(

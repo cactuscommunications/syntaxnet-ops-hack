@@ -239,9 +239,6 @@ def abs(x, name=None):
   x = tf.constant([[-2.25 + 4.75j], [-3.25 + 5.75j]])
   tf.abs(x)  # [5.25594902, 6.60492229]
   ```
-  # tensor 'x' is [[-2.25 + 4.75j], [-3.25 + 5.75j]]
-  tf.abs(x) ==> [5.25594902, 6.60492229]
-  ```
 
   Args:
     x: A `Tensor` or `SparseTensor` of type `float32`, `float64`, `int32`,

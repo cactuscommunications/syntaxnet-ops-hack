@@ -671,10 +671,6 @@ cc_library(
         ":training_ops_op_lib",
         ":user_ops_op_lib",
         ":word2vec_ops",
-        ":dragnn_ops_op_lib",
-        ":dragnn_bulk_ops_op_lib",
-        ":parser_ops_op_lib"
-
     ] + tf_additional_cloud_op_deps(),
     alwayslink = 1,
 )
@@ -3427,6 +3423,70 @@ cc_library(
     ] + tf_additional_libdevice_deps(),
 )
 
+# syntaxnet ops
+tf_gen_op_libs(
+    op_lib_names = ["parser_ops"],
+    #srcs = ["syntaxnet/ops/parser_ops.cc"],
+    deps = [
+        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/syntaxnet:document_filters",
+        "//tensorflow/core/syntaxnet:lexicon_builder",
+        "//tensorflow/core/syntaxnet:reader_ops",
+        "//tensorflow/core/syntaxnet:unpack_sparse_features",
+        ":lib"
+    ],
+)
+
+# dragnn ops
+
+tf_gen_op_libs(
+    op_lib_names = ["compute_session_op", ],
+    #srcs = ["ops/compute_session_op.h",],
+    deps = [
+        "//tensorflow/core/dragnn:compute_session",
+        "//tensorflow/core/dragnn:resource_container",
+        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/dragnn/protos:data_proto",
+        "//tensorflow/core/dragnn/protos:trace_proto",
+        "//tensorflow/core/dragnn/protos:spec_proto",
+        "@org_tensorflow//third_party/eigen3",
+        ":lib",
+        ],
+)
+
+tf_gen_op_libs(
+    op_lib_names = ["dragnn_ops", ],
+    #srcs = ["ops/dragnn_op_kernels.cc"],
+    deps = [
+        "//tensorflow/core/dragnn:compute_session",
+        ":compute_session_op_op_lib",
+        "//tensorflow/core/dragnn:compute_session_pool",
+        "//tensorflow/core/dragnn:resource_container",
+        "//tensorflow/core/dragnn/protos:data_proto",
+        "//tensorflow/core/dragnn/protos:spec_proto",
+        "//tensorflow/core/syntaxnet:base",
+        "//third_party/eigen3",
+        ":lib",
+        ],
+        
+)
+
+tf_gen_op_libs(
+    op_lib_names = [ "dragnn_bulk_ops", ],
+    #srcs = ["ops/dragnn_bulk_op_kernels.cc", "ops/compute_session_op.h"],
+    deps = [
+        ":compute_session_op_op_lib",
+        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/syntaxnet:registry",
+        "//tensorflow/core/dragnn:compute_session",
+        "//tensorflow/core/dragnn/interfaces:component",
+        "//tensorflow/core/dragnn:resource_container",
+        "//tensorflow/core/dragnn:index_translator",
+        "@org_tensorflow//third_party/eigen3",
+        ":lib",
+        ],
+)
+
 # -----------------------------------------------------------------------------
 # Google-internal targets go here (must be at the end).
 
@@ -3447,85 +3507,3 @@ alias(
     actual = ":mobile_srcs",
     visibility = ["//visibility:public"],
 )
-
-# syntaxnet hack
-
-
-
-
-
-# py graph builder and trainer
-
-# syntaxnet ops
-tf_gen_op_libs(
-    op_lib_names = ["parser_ops"],
-    #srcs = ["syntaxnet/ops/parser_ops.cc"],
-    deps = [
-        "//tensorflow/core/syntaxnet:base",
-        "//tensorflow/core/syntaxnet:document_filters",
-        "//tensorflow/core/syntaxnet:lexicon_builder",
-        "//tensorflow/core/syntaxnet:reader_ops",
-        "//tensorflow/core/syntaxnet:unpack_sparse_features",
-        ":lib"
-    ],
-)
-
-# dragnn ops
-
-tf_gen_op_libs(
-    op_lib_names = ["compute_session_op", ],
-    srcs = ["ops/compute_session_op.h",],
-    deps = [
-        "//tensorflow/core/dragnn:compute_session",
-        "//tensorflow/core/dragnn:resource_container",
-        "//tensorflow/core/syntaxnet:base",
-        "//tensorflow/core/dragnn/protos:data_proto",
-        "//tensorflow/core/dragnn/protos:trace_proto",
-        "//tensorflow/core/dragnn/protos:spec_proto",
-        "@org_tensorflow//third_party/eigen3",
-        ":lib",
-        ],
-)
-
-tf_gen_op_libs(
-    op_lib_names = ["dragnn_ops", ],
-    srcs = ["ops/dragnn_op_kernels.cc"],
-    deps = [
-        "//tensorflow/core/dragnn:compute_session",
-        ":compute_session_op_op_lib",
-        "//tensorflow/core/dragnn:compute_session_pool",
-        "//tensorflow/core/dragnn:resource_container",
-        "//tensorflow/core/dragnn/protos:data_proto",
-        "//tensorflow/core/dragnn/protos:spec_proto",
-        "//tensorflow/core/syntaxnet:base",
-        "//third_party/eigen3",
-        ":lib",
-        ],
-        
-)
-
-tf_gen_op_libs(
-    op_lib_names = [ "dragnn_bulk_ops", ],
-    srcs = ["ops/dragnn_bulk_op_kernels.cc", "ops/compute_session_op.h"],
-    deps = [
-        ":compute_session_op_op_lib",
-        "//tensorflow/core/syntaxnet:base",
-        "//tensorflow/core/syntaxnet:registry",
-        "//tensorflow/core/dragnn:compute_session",
-        "//tensorflow/core/dragnn/interfaces:component",
-        "//tensorflow/core/dragnn:resource_container",
-        "//tensorflow/core/dragnn:index_translator",
-        "@org_tensorflow//third_party/eigen3",
-        ":lib",
-        ],
-)
-
-#tf_gen_op_wrapper_py(
-#    name = "dragnn_ops",
-#    deps = [":dragnn_ops_op_lib"],
-#)
-
-#tf_gen_op_wrapper_py(
-#    name = "dragnn_bulk_ops",
-#    deps = [":dragnn_bulk_ops_op_lib"],
-#)

@@ -304,7 +304,6 @@ public final class Tensor<T> implements AutoCloseable {
     final int nflattened = numElements(shape);
     int nbytes = 0;
     if (dataType != DataType.STRING) {
-      final int nflattened = numElements(shape);
       if (nBuffered != nflattened) {
         throw incompatibleBuffer(nBuffered, shape);
       }
