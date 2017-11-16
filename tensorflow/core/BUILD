@@ -3424,10 +3424,26 @@ cc_library(
 )
 
 # syntaxnet ops
+
+cc_library(
+    name = "parser_ops",
+    srcs = ["syntaxnet/ops/parser_ops.cc"],
+    deps = [
+        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/core/syntaxnet:document_filters",
+        "//tensorflow/core/syntaxnet:lexicon_builder",
+        "//tensorflow/core/syntaxnet:reader_ops",
+        "//tensorflow/core/syntaxnet:unpack_sparse_features",
+        ":lib"
+    ],
+    alwayslink = 1,
+)
+
 tf_gen_op_libs(
     op_lib_names = ["parser_ops"],
     #srcs = ["syntaxnet/ops/parser_ops.cc"],
     deps = [
+	":parser_ops",
         "//tensorflow/core/syntaxnet:base",
         "//tensorflow/core/syntaxnet:document_filters",
         "//tensorflow/core/syntaxnet:lexicon_builder",
