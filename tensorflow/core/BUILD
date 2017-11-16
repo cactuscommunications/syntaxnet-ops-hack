@@ -671,6 +671,9 @@ cc_library(
         ":training_ops_op_lib",
         ":user_ops_op_lib",
         ":word2vec_ops",
+        ":dragnn_ops_op_lib",
+        ":dragnn_bulk_ops_op_lib",
+        ":parser_ops_op_lib",
     ] + tf_additional_cloud_op_deps(),
     alwayslink = 1,
 )
