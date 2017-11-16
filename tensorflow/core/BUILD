@@ -3426,7 +3426,7 @@ cc_library(
 # syntaxnet ops
 tf_gen_op_libs(
     op_lib_names = ["parser_ops"],
-    srcs = ["syntaxnet/ops/parser_ops.cc"],
+    srcs = ["//tensorflow/core/syntaxnet/ops/parser_ops.cc"],
     deps = [
         "//tensorflow/core/syntaxnet:base",
         "//tensorflow/core/syntaxnet:document_filters",
