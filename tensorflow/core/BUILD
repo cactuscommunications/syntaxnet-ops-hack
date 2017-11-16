@@ -3426,7 +3426,7 @@ cc_library(
 # syntaxnet ops
 tf_gen_op_libs(
     op_lib_names = ["parser_ops"],
-    #srcs = ["syntaxnet/ops/parser_ops.cc"],
+    srcs = ["syntaxnet/ops/parser_ops.cc"],
     deps = [
         "//tensorflow/core/syntaxnet:base",
         "//tensorflow/core/syntaxnet:document_filters",
@@ -3441,7 +3441,7 @@ tf_gen_op_libs(
 
 tf_gen_op_libs(
     op_lib_names = ["compute_session_op", ],
-    #srcs = ["ops/compute_session_op.h",],
+    srcs = ["ops/compute_session_op.h",],
     deps = [
         "//tensorflow/core/dragnn:compute_session",
         "//tensorflow/core/dragnn:resource_container",
@@ -3456,7 +3456,7 @@ tf_gen_op_libs(
 
 tf_gen_op_libs(
     op_lib_names = ["dragnn_ops", ],
-    #srcs = ["ops/dragnn_op_kernels.cc"],
+    srcs = ["ops/dragnn_op_kernels.cc"],
     deps = [
         "//tensorflow/core/dragnn:compute_session",
         ":compute_session_op_op_lib",
@@ -3473,7 +3473,7 @@ tf_gen_op_libs(
 
 tf_gen_op_libs(
     op_lib_names = [ "dragnn_bulk_ops", ],
-    #srcs = ["ops/dragnn_bulk_op_kernels.cc", "ops/compute_session_op.h"],
+    srcs = ["ops/dragnn_bulk_op_kernels.cc", "ops/compute_session_op.h"],
     deps = [
         ":compute_session_op_op_lib",
         "//tensorflow/core/syntaxnet:base",
