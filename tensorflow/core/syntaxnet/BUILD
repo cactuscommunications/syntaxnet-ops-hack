@@ -495,22 +495,22 @@ cc_library(
     alwayslink = 1,
 )
 
-#cc_library(
-#    name = "parser_ops_cc",
-#    srcs = ["ops/parser_ops.cc"],
-#    visibility = ["//visibility:public"],
-#    deps = [
-#        ":base",
-#        ":document_filters",
-#        ":lexicon_builder",
-#        ":reader_ops",
-#        ":unpack_sparse_features",
-#        "//tensorflow/core:framework",
-#        "//tensorflow/core:lib",
-#        "//tensorflow/core:framework_headers_lib"
-#    ],
-#    alwayslink = 1,
-#)
+cc_library(
+    name = "parser_ops_cc",
+    srcs = ["ops/parser_ops.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":base",
+        ":document_filters",
+        ":lexicon_builder",
+        ":reader_ops",
+        ":unpack_sparse_features",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:framework_headers_lib"
+    ],
+    alwayslink = 1,
+)
 
 #cc_binary(
 #    name = "parser_ops.so",

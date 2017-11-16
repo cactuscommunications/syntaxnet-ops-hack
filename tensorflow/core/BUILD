@@ -3491,7 +3491,7 @@ tf_gen_op_libs(
     op_lib_names = ["dragnn_ops", ],
     #srcs = ["ops/dragnn_op_kernels.cc"],
     deps = [
-	":dragnn_op_kernels"
+	":dragnn_op_kernels",
         "//tensorflow/core/dragnn:compute_session",
         ":compute_session_op_op_lib",
         "//tensorflow/core/dragnn:compute_session_pool",
