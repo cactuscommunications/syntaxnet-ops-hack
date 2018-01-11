@@ -31,13 +31,13 @@ limitations under the License.
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/init_main.h"
 #include "tensorflow/core/platform/protobuf.h"
-#include "tensorflow/core/protobuf/config.pb.h"
-#include "tensorflow/core/util/command_line_flags.h"
 #include "tensorflow/core/profiler/internal/advisor/tfprof_advisor.h"
-#include "tensorflow/core/profiler/internal/tfprof_options.h"
 #include "tensorflow/core/profiler/internal/tfprof_stats.h"
 #include "tensorflow/core/profiler/internal/tfprof_utils.h"
 #include "tensorflow/core/profiler/tfprof_log.pb.h"
+#include "tensorflow/core/profiler/tfprof_options.h"
+#include "tensorflow/core/protobuf/config.pb.h"
+#include "tensorflow/core/util/command_line_flags.h"
 
 namespace tensorflow {
 namespace tfprof {
@@ -234,6 +234,7 @@ int Run(int argc, char** argv) {
         return 1;
       }
       tf_stat->AddRunMeta(i, std::move(run_meta));
+      fprintf(stdout, "run graph coverage: %.2f\n", tf_stat->run_coverage());
     }
   }
 
@@ -265,7 +266,18 @@ int Run(int argc, char** argv) {
   linenoiseSetCompletionCallback(completion);
   linenoiseHistoryLoad(".tfprof_history.txt");
 
-  for (char* line = nullptr; (line = linenoise("tfprof> ")) != nullptr;) {
+  bool looped = false;
+  while (true) {
+    char* line = linenoise("tfprof> ");
+    if (line == nullptr) {
+      if (!looped) {
+        fprintf(stderr,
+                "Cannot start interative shell, "
+                "use 'bazel-bin' instead of 'bazel run'.\n");
+      }
+      break;
+    }
+    looped = true;
     string line_s = line;
     free(line);
 

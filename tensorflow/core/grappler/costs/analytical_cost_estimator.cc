@@ -34,13 +34,15 @@ AnalyticalCostEstimator::AnalyticalCostEstimator(Cluster* cluster,
                                                  bool use_static_shapes)
     : cluster_(cluster),
       node_estimator_(new OpLevelCostEstimator()),
+      node_manager_(VirtualScheduler::ReadyNodeManagerFactory("FirstReady")),
       use_static_shapes_(use_static_shapes) {}
 
 AnalyticalCostEstimator::AnalyticalCostEstimator(
     Cluster* cluster, OpLevelCostEstimator* node_estimator,
-    bool use_static_shapes)
+    ReadyNodeManager* node_manager, bool use_static_shapes)
     : cluster_(cluster),
       node_estimator_(node_estimator),
+      node_manager_(node_manager),
       use_static_shapes_(use_static_shapes) {}
 
 Status AnalyticalCostEstimator::Initialize(const GrapplerItem& item) {
@@ -61,7 +63,8 @@ Status AnalyticalCostEstimator::PredictCosts(const GraphDef& optimized_graph,
     }
   }
   std::vector<string> inaccurate_nodes;
-  VirtualScheduler scheduler(&item, use_static_shapes_, cluster_);
+  VirtualScheduler scheduler(&item, use_static_shapes_, cluster_,
+                             node_manager_.get());
   auto status = scheduler.Init();
   if (!status.ok()) {
     costs->execution_time = Costs::Duration::max();
@@ -102,12 +105,20 @@ Status AnalyticalCostEstimator::PredictCosts(const GraphDef& optimized_graph,
     }
   } while (scheduler.MarkCurrNodeExecuted(node_costs));
 
-  *costs = scheduler.Summary();
+  RunMetadata run_metadata;
+  *costs = scheduler.Summary(&run_metadata);
   VLOG(1) << inaccurate_nodes.size() << " out of "
           << optimized_graph.node_size()
           << " nodes have inaccurate time estimation";
-  for (const auto& node : inaccurate_nodes) {
-    VLOG(2) << "Node with inaccurate time estimation: " << node;
+  if (VLOG_IS_ON(3)) {
+    for (const auto& node : inaccurate_nodes) {
+      VLOG(4) << "Node with inaccurate time estimation: " << node;
+    }
+  }
+
+  if (VLOG_IS_ON(1)) {
+    bool verbosity = VLOG_IS_ON(2);
+    VLOG(1) << GetStatsStringFromRunMetadata(run_metadata, verbosity);
   }
   return Status::OK();
 }

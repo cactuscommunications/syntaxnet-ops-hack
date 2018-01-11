@@ -109,7 +109,11 @@ def build_standardized_signature_def(input_tensors, output_tensors,
     classes = _get_classification_classes(output_tensors)
     scores = _get_classification_scores(output_tensors)
     if classes is None and scores is None:
-      (_, classes), = output_tensors.items()
+      items = list(output_tensors.items())
+      if items[0][1].dtype == dtypes.string:
+        (_, classes), = items
+      else:
+        (_, scores), = items
     return signature_def_utils.classification_signature_def(
         examples, classes, scores)
   elif _is_regression_problem(problem_type, input_tensors, output_tensors):
@@ -386,7 +390,9 @@ def make_export_strategy(serving_input_fn,
                          default_output_alternative_key=None,
                          assets_extra=None,
                          as_text=False,
-                         exports_to_keep=5):
+                         exports_to_keep=5,
+                         strip_default_attrs=False):
+  # pylint: disable=line-too-long
   """Create an ExportStrategy for use with Experiment.
 
   Args:
@@ -407,10 +413,14 @@ def make_export_strategy(serving_input_fn,
     exports_to_keep: Number of exports to keep.  Older exports will be
       garbage-collected.  Defaults to 5.  Set to None to disable garbage
       collection.
+    strip_default_attrs: Boolean. If `True`, default-valued attributes will be
+      removed from the NodeDefs. For a detailed guide, see
+      [Stripping Default-Valued Attributes](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md#stripping-default-valued-attributes).
 
   Returns:
     An ExportStrategy that can be passed to the Experiment constructor.
   """
+  # pylint: enable=line-too-long
 
   def export_fn(estimator, export_dir_base, checkpoint_path=None):
     """Exports the given Estimator as a SavedModel.
@@ -439,7 +449,8 @@ def make_export_strategy(serving_input_fn,
           serving_input_fn,
           assets_extra=assets_extra,
           as_text=as_text,
-          checkpoint_path=checkpoint_path)
+          checkpoint_path=checkpoint_path,
+          strip_default_attrs=strip_default_attrs)
     else:
       export_result = estimator.export_savedmodel(
           export_dir_base,
@@ -447,7 +458,8 @@ def make_export_strategy(serving_input_fn,
           default_output_alternative_key=default_output_alternative_key,
           assets_extra=assets_extra,
           as_text=as_text,
-          checkpoint_path=checkpoint_path)
+          checkpoint_path=checkpoint_path,
+          strip_default_attrs=strip_default_attrs)
 
     garbage_collect_exports(export_dir_base, exports_to_keep)
     return export_result
@@ -460,7 +472,9 @@ def make_parsing_export_strategy(feature_columns,
                                  assets_extra=None,
                                  as_text=False,
                                  exports_to_keep=5,
-                                 target_core=False):
+                                 target_core=False,
+                                 strip_default_attrs=False):
+  # pylint: disable=line-too-long
   """Create an ExportStrategy for use with Experiment, using `FeatureColumn`s.
 
   Creates a SavedModel export that expects to be fed with a single string
@@ -488,10 +502,14 @@ def make_parsing_export_strategy(feature_columns,
     target_core: If True, prepare an ExportStrategy for use with
       tensorflow.python.estimator.*.  If False (default), prepare an
       ExportStrategy for use with tensorflow.contrib.learn.python.learn.*.
+    strip_default_attrs: Boolean. If `True`, default-valued attributes will be
+      removed from the NodeDefs. For a detailed guide, see
+      [Stripping Default-Valued Attributes](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md#stripping-default-valued-attributes).
 
   Returns:
     An ExportStrategy that can be passed to the Experiment constructor.
   """
+  # pylint: enable=line-too-long
   feature_spec = feature_column.create_feature_spec_for_parsing(feature_columns)
   if target_core:
     serving_input_fn = (
@@ -504,7 +522,8 @@ def make_parsing_export_strategy(feature_columns,
       default_output_alternative_key=default_output_alternative_key,
       assets_extra=assets_extra,
       as_text=as_text,
-      exports_to_keep=exports_to_keep)
+      exports_to_keep=exports_to_keep,
+      strip_default_attrs=strip_default_attrs)
 
 
 def _default_compare_fn(curr_best_eval_result, cand_eval_result):
@@ -580,7 +599,9 @@ class BestModelSelector(object):
 def make_best_model_export_strategy(serving_input_fn,
                                     exports_to_keep=1,
                                     compare_fn=None,
-                                    default_output_alternative_key=None):
+                                    default_output_alternative_key=None,
+                                    strip_default_attrs=False):
+  # pylint: disable=line-too-long
   """Creates an custom ExportStrategy for use with tf.contrib.learn.Experiment.
 
   Args:
@@ -592,14 +613,19 @@ def make_best_model_export_strategy(serving_input_fn,
         of evaluation result keyed by corresponding checkpoint path.
     default_output_alternative_key: the key for default serving signature for
         multi-headed inference graphs.
+    strip_default_attrs: Boolean. If `True`, default-valued attributes will be
+      removed from the NodeDefs. For a detailed guide, see
+      [Stripping Default-Valued Attributes](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md#stripping-default-valued-attributes).
 
   Returns:
     An ExportStrategy that can be passed to the Experiment constructor.
   """
+  # pylint: enable=line-too-long
   best_model_export_strategy = make_export_strategy(
       serving_input_fn,
       exports_to_keep=exports_to_keep,
-      default_output_alternative_key=default_output_alternative_key)
+      default_output_alternative_key=default_output_alternative_key,
+      strip_default_attrs=strip_default_attrs)
 
   best_model_selector = BestModelSelector(compare_fn)
 
@@ -640,18 +666,22 @@ def make_best_model_export_strategy(serving_input_fn,
 
 # TODO(b/67013778): Revisit this approach when corresponding changes to
 # TF Core are finalized.
-def extend_export_strategy(base_export_strategy, post_export_fn,
-                           post_export_name):
+def extend_export_strategy(base_export_strategy,
+                           post_export_fn,
+                           post_export_name=None):
   """Extend ExportStrategy, calling post_export_fn after export.
 
   Args:
     base_export_strategy: An ExportStrategy that can be passed to the Experiment
       constructor.
     post_export_fn: A user-specified function to call after exporting the
-      SavedModel. Takes the export directory as an argument, and returns
-      a string path to a (potentially different) SavedModel.
+      SavedModel. Takes two arguments - the path to the SavedModel exported by
+      base_export_strategy and the directory where to export the SavedModel
+      modified by the post_export_fn. Returns the path to the exported
+      SavedModel.
     post_export_name: The directory name under the export base directory where
-      SavedModels generated by the post_export_fn will be written.
+      SavedModels generated by the post_export_fn will be written. If None, the
+      directory name of base_export_strategy is used.
 
   Returns:
     An ExportStrategy that can be passed to the Experiment constructor.
@@ -671,12 +701,38 @@ def extend_export_strategy(base_export_strategy, post_export_fn,
 
     Raises:
       ValueError: If `estimator` is a ${tf.estimator.Estimator} instance
-        and `default_output_alternative_key` was specified.
+        and `default_output_alternative_key` was specified or if post_export_fn
+        does not return a valid directory.
+      RuntimeError: If unable to create temporary or final export directory.
     """
-    export_dir = base_export_strategy.export(estimator, export_dir_base,
-                                             checkpoint_path)
-    if post_export_fn:
-      export_dir = post_export_fn(export_dir)
-    return export_dir
+    tmp_base_export_folder = 'temp-base-export-' + str(int(time.time()))
+    tmp_base_export_dir = os.path.join(export_dir_base, tmp_base_export_folder)
+    if gfile.Exists(tmp_base_export_dir):
+      raise RuntimeError('Failed to obtain base export directory')
+    gfile.MakeDirs(tmp_base_export_dir)
+    tmp_base_export = base_export_strategy.export(
+        estimator, tmp_base_export_dir, checkpoint_path)
 
-  return export_strategy.ExportStrategy(post_export_name, export_fn)
+    tmp_post_export_folder = 'temp-post-export-' + str(int(time.time()))
+    tmp_post_export_dir = os.path.join(export_dir_base, tmp_post_export_folder)
+    if gfile.Exists(tmp_post_export_dir):
+      raise RuntimeError('Failed to obtain temp export directory')
+
+    gfile.MakeDirs(tmp_post_export_dir)
+    tmp_post_export = post_export_fn(tmp_base_export, tmp_post_export_dir)
+
+    if not tmp_post_export.startswith(tmp_post_export_dir):
+      raise ValueError('post_export_fn must return a sub-directory of {}'
+                       .format(tmp_post_export_dir))
+    post_export_relpath = os.path.relpath(tmp_post_export, tmp_post_export_dir)
+    post_export = os.path.join(export_dir_base, post_export_relpath)
+    if gfile.Exists(post_export):
+      raise RuntimeError('Failed to obtain final export directory')
+    gfile.Rename(tmp_post_export, post_export)
+
+    gfile.DeleteRecursively(tmp_base_export_dir)
+    gfile.DeleteRecursively(tmp_post_export_dir)
+    return post_export
+
+  name = post_export_name if post_export_name else base_export_strategy.name
+  return export_strategy.ExportStrategy(name, export_fn)

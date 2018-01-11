@@ -18,7 +18,7 @@
 
 #include "util/utf8/unilib.h"
 
-#include "tensorflow/core/syntaxnet/base.h"
+#include "tensorflow/user_ops/syntaxnet/base.h"
 #include "third_party/utf/utf.h"
 
 namespace UniLib {

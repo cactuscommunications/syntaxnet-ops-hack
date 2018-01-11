@@ -259,6 +259,13 @@ TEST_F(ConstantFoldingTest, TestNoReplaceLargeConstant) {
   TF_EXPECT_OK(ConstantFold(ConstantFoldingOptions{}, nullptr, Env::Default(),
                             nullptr, &g, &was_mutated));
   EXPECT_FALSE(was_mutated);
+
+  // Increase the limit and the concat should now be constant folded.
+  ConstantFoldingOptions opt;
+  opt.max_constant_size_in_bytes = 10 * 1024 * 1024 + 4;
+  TF_EXPECT_OK(
+      ConstantFold(opt, nullptr, Env::Default(), nullptr, &g, &was_mutated));
+  EXPECT_TRUE(was_mutated);
 }
 
 TEST_F(ConstantFoldingTest, TestNoReplaceFunctionCall) {
@@ -328,6 +335,40 @@ TEST_F(ConstantFoldingTest, TestNoReplaceNonCPUOp) {
   bool was_mutated;
   TF_EXPECT_OK(ConstantFold(ConstantFoldingOptions{}, nullptr, Env::Default(),
                             nullptr, &g, &was_mutated));
+  EXPECT_FALSE(was_mutated);
+}
+
+TEST_F(ConstantFoldingTest, Placeholders) {
+  Graph g(OpRegistry::Global());
+  {
+    Scope s = Scope::NewRootScope();
+    auto placeholder = ops::Placeholder(s, DT_DOUBLE);
+    auto add = ops::Add(s, placeholder, 2.0);
+    auto send =
+        ops::_Send(s.WithOpName("send"), add, "add", "sender", 0, "receiver");
+    TF_ASSERT_OK(s.ToGraph(&g));
+  }
+  bool was_mutated;
+  Status s = ConstantFold(ConstantFoldingOptions{}, nullptr, Env::Default(),
+                          nullptr, &g, &was_mutated);
+  EXPECT_FALSE(was_mutated);
+  EXPECT_FALSE(s.ok());
+  EXPECT_TRUE(s.error_message().find(
+                  "You must feed a value for placeholder "
+                  "tensor 'Placeholder' with dtype double") != string::npos);
+
+  Graph g2(OpRegistry::Global());
+  {
+    Scope s = Scope::NewRootScope();
+    auto placeholder = ops::PlaceholderWithDefault(s, {1.0}, {1});
+    auto add = ops::Add(s, placeholder, 2.0);
+    auto send =
+        ops::_Send(s.WithOpName("send"), add, "add", "sender", 0, "receiver");
+    TF_ASSERT_OK(s.ToGraph(&g2));
+  }
+  // TODO(skyewm): should this have the same behavior as Placeholder?
+  TF_EXPECT_OK(ConstantFold(ConstantFoldingOptions{}, nullptr, Env::Default(),
+                            nullptr, &g2, &was_mutated));
   EXPECT_FALSE(was_mutated);
 }
 

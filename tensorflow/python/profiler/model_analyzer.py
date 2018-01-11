@@ -20,6 +20,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+
 import six
 
 from google.protobuf import message
@@ -157,9 +159,10 @@ class Profiler(object):
       op_log: optional. tensorflow::tfprof::OpLogProto proto. Used to define
           extra op types.
     """
+    self._coverage = 0.0
     self._graph = graph
     # pylint: disable=protected-access
-    op_log = tfprof_logger._merge_default_with_oplog(
+    op_log = tfprof_logger.merge_default_with_oplog(
         self._graph, op_log=op_log)
     # pylint: enable=protected-access
 
@@ -174,16 +177,17 @@ class Profiler(object):
     """Add statistics of a step.
 
     Args:
-      step: int, A step used to identify the RunMetadata. Must be different
-         across different AddStep() calls.
+      step: int, An id used to group one or more different `run_meta` together.
+          When profiling with the profile_xxx APIs, user can use the `step`
+          id in the `options` to profile these `run_meta` together.
       run_meta: RunMetadata proto that contains statistics of a session run.
     """
     # pylint: disable=protected-access
-    op_log = tfprof_logger._merge_default_with_oplog(
+    op_log = tfprof_logger.merge_default_with_oplog(
         self._graph, run_meta=run_meta)
     # pylint: enable=protected-access
     # TODO(xpan): P1: Better to find the current graph.
-    print_mdl.AddStep(
+    self._coverage = print_mdl.AddStep(
         step,
         self._graph.as_graph_def(add_shapes=True).SerializeToString(),
         run_meta.SerializeToString(), op_log.SerializeToString())
@@ -205,8 +209,8 @@ class Profiler(object):
     try:
       tfprof_node.ParseFromString(
           print_mdl.Profile('code'.encode('utf-8'), opts.SerializeToString()))
-    except message.DecodeError as _:
-      pass
+    except message.DecodeError as e:
+      sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
     return tfprof_node
 
   def profile_operations(self, options):
@@ -222,8 +226,8 @@ class Profiler(object):
     try:
       tfprof_node.ParseFromString(
           print_mdl.Profile('op'.encode('utf-8'), opts.SerializeToString()))
-    except message.DecodeError as _:
-      pass
+    except message.DecodeError as e:
+      sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
     return tfprof_node
 
   def profile_name_scope(self, options):
@@ -239,8 +243,8 @@ class Profiler(object):
     try:
       tfprof_node.ParseFromString(
           print_mdl.Profile('scope'.encode('utf-8'), opts.SerializeToString()))
-    except message.DecodeError as _:
-      pass
+    except message.DecodeError as e:
+      sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
     return tfprof_node
 
   def profile_graph(self, options):
@@ -256,8 +260,8 @@ class Profiler(object):
     try:
       tfprof_node.ParseFromString(
           print_mdl.Profile('graph'.encode('utf-8'), opts.SerializeToString()))
-    except message.DecodeError as _:
-      pass
+    except message.DecodeError as e:
+      sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
     return tfprof_node
 
   def advise(self, options):
@@ -273,6 +277,10 @@ class Profiler(object):
     advise_pb.ParseFromString(
         print_mdl.Profile('advise'.encode('utf-8'), opts.SerializeToString()))
     return advise_pb
+
+  def _write_profile(self, filename):
+    """Writes the profile to a file."""
+    print_mdl.WriteProfile(filename)
 
 
 def profile(graph,
@@ -308,7 +316,7 @@ def profile(graph,
                .trainable_variables_parameter())
 
   # pylint: disable=protected-access
-  op_log = tfprof_logger._merge_default_with_oplog(
+  op_log = tfprof_logger.merge_default_with_oplog(
       graph, op_log, run_meta, add_trace=cmd == 'code')
   # pylint: enable=protected-access
 
@@ -326,9 +334,8 @@ def profile(graph,
         opts.SerializeToString())
     try:
       tfprof_node.ParseFromString(ret)
-    except message.DecodeError as _:
-      pass
-      # sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
+    except message.DecodeError as e:
+      sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
 
   elif cmd == 'graph' or cmd == 'scope':
     tfprof_node = tfprof_output_pb2.GraphNodeProto()
@@ -340,9 +347,8 @@ def profile(graph,
         opts.SerializeToString())
     try:
       tfprof_node.ParseFromString(ret)
-    except message.DecodeError as _:
-      pass
-      # sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
+    except message.DecodeError as e:
+      sys.stderr.write('Cannot parse returned proto: %s.\n' % e)
   else:
     raise errors.InvalidArgumentError(
         None, None, 'unknown cmd: %s\n' % cmd)
@@ -369,7 +375,7 @@ def advise(graph, run_meta=None, options=_DEFAULT_ADVISE_OPTIONS):
     options = ALL_ADVICE.copy()
 
   # pylint: disable=protected-access
-  op_log = tfprof_logger._merge_default_with_oplog(
+  op_log = tfprof_logger.merge_default_with_oplog(
       graph, None, run_meta, add_trace=True)
   # pylint: enable=protected-access
 

@@ -24,6 +24,7 @@ java_library(
     ],
     data = [":libtensorflow_jni"],
     javacopts = JAVACOPTS,
+    plugins = [":processor"],
     visibility = ["//visibility:public"],
 )
 
@@ -39,6 +40,21 @@ filegroup(
         "//tensorflow/contrib/android:__pkg__",
         "//tensorflow/java:__pkg__",
     ],
+)
+
+java_plugin(
+    name = "processor",
+    generates_api = True,
+    processor_class = "org.tensorflow.processor.OperatorProcessor",
+    visibility = ["//visibility:public"],
+    deps = [":processor_library"],
+)
+
+java_library(
+    name = "processor_library",
+    srcs = glob(["src/gen/java/org/tensorflow/processor/**/*.java"]),
+    javacopts = JAVACOPTS,
+    resources = glob(["src/gen/resources/META-INF/services/javax.annotation.processing.Processor"]),
 )
 
 filegroup(
@@ -81,10 +97,27 @@ tf_java_op_gen_srcjar(
 # file before making it an executable. See tf_java_op_gen_srcjar().
 cc_library(
     name = "java_op_gen_tool",
-    srcs = glob([
-        "src/gen/cc/*.h",
-        "src/gen/cc/*.cc",
-    ]),
+    srcs = [
+        "src/gen/cc/op_gen_main.cc",
+    ],
+    copts = tf_copts(),
+    deps = [
+        ":java_op_gen_lib",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:framework_internal",
+        "//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "java_op_gen_lib",
+    srcs = [
+        "src/gen/cc/op_generator.cc",
+    ],
+    hdrs = [
+        "src/gen/cc/java_defs.h",
+        "src/gen/cc/op_generator.h",
+    ],
     copts = tf_copts(),
     deps = [
         "//tensorflow/core:framework",
@@ -262,6 +295,14 @@ tf_java_test(
         ":testutil",
         "@junit",
     ],
+)
+
+filegroup(
+    name = "processor_test_resources",
+    srcs = glob([
+        "src/test/resources/org/tensorflow/**/*.java",
+        "src/main/java/org/tensorflow/op/annotation/Operator.java",
+    ]),
 )
 
 filegroup(

@@ -22,7 +22,8 @@
 #include <string>                       // for string
 #include <utility>                      // for pair
 
-#include "tensorflow/core/syntaxnet/base.h"
+#include "tensorflow/user_ops/syntaxnet/base.h"
+//typedef signed int char32;
 
 // ***************************** UnicodeText **************************
 //

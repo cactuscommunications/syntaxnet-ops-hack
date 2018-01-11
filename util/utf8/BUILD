@@ -15,11 +15,11 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//tensorflow/core/syntaxnet:base",
         "//third_party/utf",
-        "//tensorflow/core:framework_headers_lib",
-        "//tensorflow/core:framework",
-        "//tensorflow/core:lib",
+	"//tensorflow/user_ops/syntaxnet:base",
+        #"//tensorflow/core:framework_headers_lib",
+        #"//tensorflow/core:framework",
+        #"//tensorflow/core:lib",
     ],
 )
 

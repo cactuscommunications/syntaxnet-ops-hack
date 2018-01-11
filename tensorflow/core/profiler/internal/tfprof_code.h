@@ -28,12 +28,12 @@ limitations under the License.
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/profiler/internal/tfprof_node.h"
-#include "tensorflow/core/profiler/internal/tfprof_options.h"
 #include "tensorflow/core/profiler/internal/tfprof_show_multi.h"
 #include "tensorflow/core/profiler/internal/tfprof_timeline.h"
 #include "tensorflow/core/profiler/internal/tfprof_utils.h"
 #include "tensorflow/core/profiler/profile.pb.h"
 #include "tensorflow/core/profiler/tfprof_log.pb.h"
+#include "tensorflow/core/profiler/tfprof_options.h"
 #include "tensorflow/core/profiler/tfprof_output.pb.h"
 
 namespace tensorflow {
@@ -85,9 +85,6 @@ class TFCode : public TFMultiShow {
   string FormatNode(CodeNode* node, const Options& opts, int64 indent) const;
   string FormatNodeMemory(CodeNode* node, int64 bytes, int64 total_bytes) const;
 
-  // Common traces track the code path that all traces share. Such as
-  // "main()", "create_op", etc.
-  std::set<string> common_traces_;
   std::unique_ptr<CodeNode> root_;
   std::unique_ptr<TFMultiGraphNode> graph_root_;
   std::unique_ptr<PprofProfile> pprof_profile_;
