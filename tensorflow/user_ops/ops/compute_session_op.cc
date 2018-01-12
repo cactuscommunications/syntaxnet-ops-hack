@@ -15,8 +15,8 @@
 
 #include "compute_session_op.h"
 
-#include "tensorflow/core/dragnn/compute_session.h"
-#include "tensorflow/core/dragnn/resource_container.h"
+#include "tensorflow/user_ops/dragnn/compute_session.h"
+#include "tensorflow/user_ops/dragnn/resource_container.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 
 namespace syntaxnet {

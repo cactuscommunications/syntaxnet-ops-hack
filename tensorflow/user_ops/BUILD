@@ -16,8 +16,12 @@ load("//tensorflow:tensorflow.bzl", "tf_custom_op_library")
 tf_custom_op_library(
     name = "syntaxnet_dragnn_ops.so",
     srcs = [
+	"ops/parser_ops.cc",
 	"ops/compute_session_op.h",
+	"ops/compute_session_op.cc",
+	"ops/dragnn_ops.cc",
     	"ops/dragnn_op_kernels.cc",
+	"ops/dragnn_bulk_ops.cc",
 	"ops/dragnn_bulk_op_kernels.cc", 
     ],
     deps = [

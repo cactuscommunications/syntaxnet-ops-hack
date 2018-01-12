@@ -150,6 +150,7 @@ cc_library(
         ":feature_extractor_proto_cc",
         ":utils",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -161,11 +162,13 @@ cc_library(
         ":sentence_proto_cc",
         ":task_context",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
     name = "char_properties",
     srcs = ["char_properties.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["char_properties.h"],
     deps = [
         ":registry",
@@ -178,6 +181,7 @@ cc_library(
 cc_library(
     name = "char_ngram_string_extractor",
     srcs = ["char_ngram_string_extractor.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["char_ngram_string_extractor.h"],
     deps = [
         ":base",
@@ -190,6 +194,7 @@ cc_library(
 cc_library(
     name = "segmenter_utils",
     srcs = ["segmenter_utils.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["segmenter_utils.h"],
     deps = [
         ":base",
@@ -205,6 +210,7 @@ cc_library(
 cc_library(
     name = "feature_extractor",
     srcs = ["feature_extractor.cc"],
+    visibility = ["//visibility:public"],
     hdrs = [
         "feature_extractor.h",
         "feature_types.h",
@@ -224,6 +230,7 @@ cc_library(
 cc_library(
     name = "affix",
     srcs = ["affix.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["affix.h"],
     deps = [
         ":dictionary_proto_cc",
@@ -234,11 +241,13 @@ cc_library(
         ":utils",
         ":workspace",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
     name = "sentence_features",
     srcs = ["sentence_features.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["sentence_features.h"],
     deps = [
         ":affix",
@@ -258,6 +267,7 @@ cc_library(
 cc_library(
     name = "whole_sentence_features",
     srcs = ["whole_sentence_features.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["whole_sentence_features.h"],
     deps = [
         ":base",
@@ -272,6 +282,7 @@ cc_library(
 cc_library(
     name = "shared_store",
     srcs = ["shared_store.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["shared_store.h"],
     deps = [
         ":utils",
@@ -281,6 +292,7 @@ cc_library(
 cc_library(
     name = "registry",
     srcs = ["registry.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["registry.h"],
     deps = [
         ":utils",
@@ -291,6 +303,7 @@ cc_library(
 cc_library(
     name = "workspace",
     srcs = ["workspace.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["workspace.h"],
     deps = [
         ":utils",
@@ -300,6 +313,7 @@ cc_library(
 cc_library(
     name = "task_context",
     srcs = ["task_context.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["task_context.h"],
     deps = [
         ":task_spec_proto_cc",
@@ -324,6 +338,7 @@ cc_library(
 cc_library(
     name = "morphology_label_set",
     srcs = ["morphology_label_set.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["morphology_label_set.h"],
     deps = [
         "//tensorflow/core:framework_headers_lib",
@@ -357,6 +372,7 @@ cc_library(
         "shift_transitions.cc",
         "tagger_transitions.cc",
     ],
+    visibility = ["//visibility:public"],
     hdrs = [
         "binary_segment_state.h",
         "char_shift_transitions.h",
@@ -400,6 +416,7 @@ cc_library(
 cc_library(
     name = "embedding_feature_extractor",
     srcs = ["embedding_feature_extractor.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["embedding_feature_extractor.h"],
     deps = [
         ":base",
@@ -416,6 +433,7 @@ cc_library(
 cc_library(
     name = "sentence_batch",
     srcs = ["sentence_batch.cc"],
+    visibility = ["//visibility:public"],
     hdrs = ["sentence_batch.h"],
     deps = [
         ":embedding_feature_extractor",
@@ -436,6 +454,7 @@ cc_library(
         "beam_reader_ops.cc",
         "reader_ops.cc",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         ":parser_transitions",
         ":sentence_batch",
@@ -450,6 +469,7 @@ cc_library(
 cc_library(
     name = "document_filters",
     srcs = ["document_filters.cc"],
+    visibility = ["//visibility:public"],
     deps = [
         ":document_format",
         ":parser_transitions",
@@ -465,6 +485,7 @@ cc_library(
 cc_library(
     name = "lexicon_builder",
     srcs = ["lexicon_builder.cc"],
+    visibility = ["//visibility:public"],
     deps = [
         ":affix",
         ":base",

@@ -17,6 +17,7 @@ cc_library(
         "//tensorflow/user_ops/dragnn/interfaces:transition_state",
         "//tensorflow/user_ops/syntaxnet:base",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -33,6 +34,7 @@ cc_library(
         "//tensorflow/user_ops/dragnn/protos:spec_proto_cc",
         "//tensorflow/user_ops/dragnn/protos:trace_proto_cc",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -46,6 +48,7 @@ cc_library(
         "//tensorflow/user_ops/dragnn/protos:spec_proto_cc",
         "//tensorflow/user_ops/dragnn/protos:trace_proto_cc",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -64,6 +67,7 @@ cc_library(
         "//tensorflow/user_ops/syntaxnet:registry",
         "//util/utf8:unicodetext"
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -77,6 +81,7 @@ cc_library(
         "//tensorflow/user_ops/dragnn/protos:spec_proto_cc",
         "//tensorflow/user_ops/syntaxnet:base",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -97,6 +102,7 @@ cc_library(
         #"//tensorflow/core:framework",
         #"//tensorflow/core:lib",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
@@ -106,12 +112,14 @@ cc_library(
         "//tensorflow/user_ops/dragnn/interfaces:input_batch",
         "//tensorflow/user_ops/syntaxnet:base",
     ],
+    alwayslink = 1,
 )
 
 cc_library(
     name = "resource_container",
     hdrs = ["resource_container.h"],
     deps = ["//tensorflow/user_ops/syntaxnet:base"],
+    alwayslink = 1,
 )
 
 # Tensorflow op kernel BUILD rules.
