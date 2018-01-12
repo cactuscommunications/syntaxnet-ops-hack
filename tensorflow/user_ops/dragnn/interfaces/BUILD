@@ -1,6 +1,6 @@
 package(
     default_visibility = ["//visibility:public"],
-    features = ["-layering_check"],
+    #features = ["-layering_check"],
 )
 
 cc_library(
@@ -14,12 +14,12 @@ cc_library(
     hdrs = ["component.h"],
     deps = [
         ":transition_state",
-        "//tensorflow/core/dragnn/components/util:bulk_feature_extractor",
-        "//tensorflow/core/dragnn:input_batch_cache",
-        "//tensorflow/core/dragnn/protos:spec_proto",
-        "//tensorflow/core/dragnn/protos:trace_proto",
-        "//tensorflow/core/syntaxnet:base",
-        "//tensorflow/core/syntaxnet:registry",
+        "//tensorflow/user_ops/dragnn/components/util:bulk_feature_extractor",
+        "//tensorflow/user_ops/dragnn:input_batch_cache",
+        "//tensorflow/user_ops/dragnn/protos:spec_proto_cc",
+        "//tensorflow/user_ops/dragnn/protos:trace_proto_cc",
+        "//tensorflow/user_ops/syntaxnet:base",
+        "//tensorflow/user_ops/syntaxnet:registry",
     ],
 )
 
@@ -27,7 +27,7 @@ cc_library(
     name = "input_batch",
     hdrs = ["input_batch.h"],
     deps = [
-        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/user_ops/syntaxnet:base",
     ],
 )
 
@@ -35,6 +35,6 @@ cc_library(
     name = "transition_state",
     hdrs = ["transition_state.h"],
     deps = [
-        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/user_ops/syntaxnet:base",
     ],
 )

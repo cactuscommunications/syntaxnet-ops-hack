@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "compute_session_op.h"
-#include "tensorflow/core/dragnn/resource_container.h"
+#include "tensorflow/user_ops/dragnn/resource_container.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/numeric_types.h"
 #include "tensorflow/core/framework/op_kernel.h"

@@ -13,7 +13,7 @@
 // limitations under the License.
 // =============================================================================
 
-#include "tensorflow/core/dragnn/index_translator.h"
+#include "tensorflow/user_ops/dragnn/index_translator.h"
 
 #include "tensorflow/core/platform/logging.h"
 

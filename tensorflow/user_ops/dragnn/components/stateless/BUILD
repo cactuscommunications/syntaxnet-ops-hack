@@ -7,12 +7,12 @@ cc_library(
     name = "stateless_component",
     srcs = ["stateless_component.cc"],
     deps = [
-        "//tensorflow/core/dragnn:component_registry",
-        "//tensorflow/core/dragnn/interfaces:component",
-        "//tensorflow/core/dragnn/interfaces:transition_state",
-        "//tensorflow/core/dragnn/io:sentence_input_batch",
-        "//tensorflow/core/dragnn/protos:data_proto",
-        "//tensorflow/core/syntaxnet:base",
+        "//tensorflow/user_ops/dragnn:component_registry",
+        "//tensorflow/user_ops/dragnn/interfaces:component",
+        "//tensorflow/user_ops/dragnn/interfaces:transition_state",
+        "//tensorflow/user_ops/dragnn/io:sentence_input_batch",
+        "//tensorflow/user_ops/dragnn/protos:data_proto",
+        "//tensorflow/user_ops/syntaxnet:base",
     ],
     alwayslink = 1,
 )

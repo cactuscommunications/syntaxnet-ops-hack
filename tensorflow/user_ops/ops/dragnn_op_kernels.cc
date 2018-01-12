@@ -17,12 +17,12 @@
 #include <string>
 #include <vector>
 
-#include "tensorflow/core/dragnn/compute_session.h"
-#include "tensorflow/core/dragnn/compute_session_pool.h"
+#include "tensorflow/user_ops/dragnn/compute_session.h"
+#include "tensorflow/user_ops/dragnn/compute_session_pool.h"
 #include "compute_session_op.h"
-#include "tensorflow/core/dragnn/resource_container.h"
-#include "tensorflow/core/dragnn/protos/data.pb.h"
-#include "tensorflow/core/dragnn/protos/spec.pb.h"
+#include "tensorflow/user_ops/dragnn/resource_container.h"
+#include "tensorflow/user_ops/dragnn/protos/data.pb.h"
+#include "tensorflow/user_ops/dragnn/protos/spec.pb.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/resource_mgr.h"

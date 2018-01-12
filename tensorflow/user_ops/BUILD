@@ -12,9 +12,47 @@ exports_files(["LICENSE"])
 load("//tensorflow:tensorflow.bzl", "tf_py_test")
 load("//tensorflow:tensorflow.bzl", "tf_custom_op_library")
 
+# All syntaxnet/dragnn ops 
+tf_custom_op_library(
+    name = "syntaxnet_dragnn_ops.so",
+    srcs = [
+	"ops/compute_session_op.h",
+    	"ops/dragnn_op_kernels.cc",
+	"ops/dragnn_bulk_op_kernels.cc", 
+    ],
+    deps = [
+	"//util/utf8:unicodetext",
+        "//tensorflow/user_ops/syntaxnet:document_filters",
+        "//tensorflow/user_ops/syntaxnet:lexicon_builder",
+        "//tensorflow/user_ops/syntaxnet:reader_ops",
+        "//tensorflow/user_ops/syntaxnet:unpack_sparse_features",
+	"//tensorflow/user_ops/syntaxnet:registry",
+        "//tensorflow/user_ops/dragnn/protos:data_proto_cc",
+        "//tensorflow/user_ops/dragnn/protos:trace_proto_cc",
+        "//tensorflow/user_ops/dragnn/protos:spec_proto_cc",
+	"//tensorflow/user_ops/dragnn:compute_session",
+        "//tensorflow/user_ops/dragnn:resource_container",
+        "//tensorflow/user_ops/dragnn:compute_session_pool",
+        "//tensorflow/user_ops/dragnn/interfaces:component",
+        "//tensorflow/user_ops/dragnn:index_translator",
+    ],
+)
+
+#tf_custom_op_library(
+#    name = "syntaxnet_dragnn_ops.so",
+#    srcs = [],
+#    deps = [
+#	":parser_ops",
+#	":compute_session_op",
+#	":dragnn_ops",
+#	":dragnn_bulk_ops",
+#    ],
+#)
+
+
 # syntaxnet ops
 tf_custom_op_library(
-    name = "syntaxnet_parser_ops.so",
+    name = "parser_ops",
     #srcs = ["//tensorflow/user_ops/syntaxnet/ops/parser_ops.cc"],
     deps = [
         #"//tensorflow/user_ops/syntaxnet:base",

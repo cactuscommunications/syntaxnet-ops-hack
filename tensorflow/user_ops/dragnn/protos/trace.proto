@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-import "tensorflow/core/dragnn/protos/data.proto";
+import "tensorflow/user_ops/dragnn/protos/data.proto";
 
 
 package syntaxnet.dragnn;

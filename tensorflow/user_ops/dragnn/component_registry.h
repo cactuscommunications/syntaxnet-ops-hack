@@ -16,8 +16,8 @@
 #ifndef NLP_SAFT_OPENSOURCE_DRAGNN_CORE_COMPONENT_REGISTRY_H_
 #define NLP_SAFT_OPENSOURCE_DRAGNN_CORE_COMPONENT_REGISTRY_H_
 
-#include "tensorflow/core/dragnn/interfaces/component.h"
-#include "tensorflow/core/syntaxnet/registry.h"
+#include "tensorflow/user_ops/dragnn/interfaces/component.h"
+#include "tensorflow/user_ops/syntaxnet/registry.h"
 
 // Macro to add a component to the registry. This macro associates a class with
 // its class name as a string, so FooComponent would be associated with the

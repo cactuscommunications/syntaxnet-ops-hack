@@ -13,12 +13,12 @@
 // limitations under the License.
 // =============================================================================
 
-#include "tensorflow/core/dragnn/compute_session_pool.h"
+#include "tensorflow/user_ops/dragnn/compute_session_pool.h"
 
 #include <utility>
 
-#include "tensorflow/core/dragnn/component_registry.h"
-#include "tensorflow/core/dragnn/compute_session_impl.h"
+#include "tensorflow/user_ops/dragnn/component_registry.h"
+#include "tensorflow/user_ops/dragnn/compute_session_impl.h"
 #include "tensorflow/core/platform/logging.h"
 
 namespace syntaxnet {

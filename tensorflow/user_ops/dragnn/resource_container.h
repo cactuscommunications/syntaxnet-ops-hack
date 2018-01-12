@@ -18,7 +18,7 @@
 
 #include <memory>
 
-#include "tensorflow/core/syntaxnet/base.h"
+#include "tensorflow/user_ops/syntaxnet/base.h"
 #include "tensorflow/core/framework/resource_mgr.h"
 
 namespace syntaxnet {

@@ -13,7 +13,7 @@
 // limitations under the License.
 // =============================================================================
 
-#include "tensorflow/core/dragnn/component_registry.h"
+#include "tensorflow/user_ops/dragnn/component_registry.h"
 
 namespace syntaxnet {
 

@@ -20,7 +20,7 @@
 #include <string>
 #include <typeindex>
 
-#include "tensorflow/core/dragnn/interfaces/input_batch.h"
+#include "tensorflow/user_ops/dragnn/interfaces/input_batch.h"
 #include "tensorflow/core/platform/logging.h"
 
 namespace syntaxnet {

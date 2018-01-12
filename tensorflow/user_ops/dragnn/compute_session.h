@@ -21,8 +21,8 @@
 #include "components/util/bulk_feature_extractor.h"
 #include "index_translator.h"
 #include "interfaces/component.h"
-#include "tensorflow/core/dragnn/protos/spec.pb.h"
-#include "tensorflow/core/dragnn/protos/trace.pb.h"
+#include "tensorflow/user_ops/dragnn/protos/spec.pb.h"
+#include "tensorflow/user_ops/dragnn/protos/trace.pb.h"
 
 namespace syntaxnet {
 namespace dragnn {
