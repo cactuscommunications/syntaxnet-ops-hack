@@ -1,4 +1,4 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,25 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Probabilistic optimizer modules.
-
-See ${python/contrib.bayesflow.optimizers}.
-"""
+"""Exception types for TensorFlow errors."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# pylint: disable=unused-import
+from tensorflow.python.framework import errors_impl as _impl
+# pylint: enable=unused-import
 # go/tf-wildcard-import
 # pylint: disable=wildcard-import
-from tensorflow.contrib.bayesflow.python.ops.sgld_optimizer import *
-from tensorflow.contrib.bayesflow.python.ops.variational_sgd_optimizer import *
+from tensorflow.python.framework.errors_impl import *
 # pylint: enable=wildcard-import
-from tensorflow.python.util.all_util import remove_undocumented
 
-_allowed_symbols = [
-    'SGLDOptimizer',
-    'VariationalSGDOptimizer',
-]
-
-remove_undocumented(__name__, _allowed_symbols)

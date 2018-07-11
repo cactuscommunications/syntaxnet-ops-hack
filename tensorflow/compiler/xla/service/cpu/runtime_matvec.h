@@ -13,16 +13,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include <algorithm>
-#include <cassert>
+#ifndef TENSORFLOW_COMPILER_XLA_SERVICE_CPU_RUNTIME_MATVEC_H_
+#define TENSORFLOW_COMPILER_XLA_SERVICE_CPU_RUNTIME_MATVEC_H_
 
 #include "third_party/eigen3/Eigen/Core"
-#include "tensorflow/compiler/xla/service/cpu/runtime_matvec.h"
+
+#include "tensorflow/core/platform/types.h"
+
+namespace xla {
+
+namespace detail {
 
 using tensorflow::int32;
 using tensorflow::int64;
-
-namespace {
 
 // Does mat * x or mat^T * x.
 template <typename T>
@@ -91,20 +94,28 @@ void DispatchMatVec(T* out, T* lhs, T* rhs, int64 m, int64 n, int64 k,
   MatVec<T>(out, mat, vec, rows, cols, transpose_mat);
 }
 
-}  // namespace
+}  // namespace detail
 
-namespace xla {
-
-void EigenMatVecF32(float* out, float* lhs, float* rhs, int64 m, int64 n,
-                    int64 k, int32 transpose_lhs, int32 transpose_rhs) {
+// Performs a matrix-vector multiplication using Eigen. 'lhs' and 'rhs' are
+// pointers to buffers containing input matrices in column-major order. 'out' is
+// a pointer to a buffer sufficiently large to hold the result of the
+// operation. Following standard nomenclature: lhs is m x k, rhs is k x n, and
+// out is m x n.
+//
+// This requires that m = 1 or n = 1.
+//
+// TODO(b/64684907): Compare runtime performance of these functions with dot
+// simplification.
+template <typename T>
+void EigenMatVec(T* out, T* lhs, T* rhs, tensorflow::int64 m,
+                 tensorflow::int64 n, tensorflow::int64 k,
+                 tensorflow::int32 transpose_lhs,
+                 tensorflow::int32 transpose_rhs) {
   assert((m == 1 || n == 1) && "not a matrix-vector multiply");
-  DispatchMatVec<float>(out, lhs, rhs, m, n, k, transpose_lhs, transpose_rhs);
-}
-
-void EigenMatVecF64(double* out, double* lhs, double* rhs, int64 m, int64 n,
-                    int64 k, int32 transpose_lhs, int32 transpose_rhs) {
-  assert((m == 1 || n == 1) && "not a matrix-vector multiply");
-  DispatchMatVec<double>(out, lhs, rhs, m, n, k, transpose_lhs, transpose_rhs);
+  detail::DispatchMatVec<T>(out, lhs, rhs, m, n, k, transpose_lhs,
+                            transpose_rhs);
 }
 
 }  // namespace xla
+
+#endif  // TENSORFLOW_COMPILER_XLA_SERVICE_CPU_RUNTIME_MATVEC_H_

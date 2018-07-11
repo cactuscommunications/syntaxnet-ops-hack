@@ -1,4 +1,4 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,40 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Csiszar f-Divergence and helpers.
 
-See ${python/contrib.bayesflow.csiszar_divergence}.
-"""
-
+"""Evaluation-related metrics."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 # go/tf-wildcard-import
 # pylint: disable=wildcard-import
-from tensorflow.contrib.bayesflow.python.ops.csiszar_divergence_impl import *
+from tensorflow.python.ops.metrics_impl import *
 # pylint: enable=wildcard-import
-from tensorflow.python.util.all_util import remove_undocumented
-
-_allowed_symbols = [
-    'amari_alpha',
-    'arithmetic_geometric',
-    'chi_square',
-    'csiszar_vimco',
-    'dual_csiszar_function',
-    'jeffreys',
-    'jensen_shannon',
-    'kl_forward',
-    'kl_reverse',
-    'log1p_abs',
-    'modified_gan',
-    'monte_carlo_csiszar_f_divergence',
-    'pearson',
-    'squared_hellinger',
-    'symmetrized_csiszar_function',
-    'total_variation',
-    't_power',
-    'triangular',
-]
-
-remove_undocumented(__name__, _allowed_symbols)

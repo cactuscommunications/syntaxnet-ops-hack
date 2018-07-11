@@ -1,4 +1,4 @@
-# Copyright 2017 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,22 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Support for low discrepancy Halton sequences.
 
+# pylint: disable=g-short-docstring-punctuation
+"""Image processing and decoding ops.
+
+See the @{$python/image} guide.
 """
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+
 # go/tf-wildcard-import
 # pylint: disable=wildcard-import
-from tensorflow.contrib.bayesflow.python.ops.halton_sequence_impl import *
+from tensorflow.python.ops.gen_image_ops import *
+from tensorflow.python.ops.image_ops_impl import *
 # pylint: enable=wildcard-import
-from tensorflow.python.util.all_util import remove_undocumented
 
-_allowed_symbols = [
-    'sample',
-]
-
-remove_undocumented(__name__, _allowed_symbols)
+# TODO(drpng): remove these once internal use has discontinued.
+# pylint: disable=unused-import
+from tensorflow.python.ops.image_ops_impl import _Check3DImage
+from tensorflow.python.ops.image_ops_impl import _ImageDimensions
+# pylint: enable=unused-import
