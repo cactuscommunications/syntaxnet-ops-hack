@@ -107,9 +107,9 @@ class _WishartLinearOperator(distribution.Distribution):
       ValueError: if df < k, where scale operator event shape is
         `(k, k)`
     """
-    parameters = locals()
+    parameters = dict(locals())
     self._cholesky_input_output_matrices = cholesky_input_output_matrices
-    with ops.name_scope(name) as ns:
+    with ops.name_scope(name) as name:
       with ops.name_scope("init", values=[df, scale_operator]):
         if not scale_operator.dtype.is_floating:
           raise TypeError(
@@ -163,7 +163,7 @@ class _WishartLinearOperator(distribution.Distribution):
         parameters=parameters,
         graph_parents=([self._df, self._dimension] +
                        self._scale_operator.graph_parents),
-        name=ns)
+        name=name)
 
   @property
   def df(self):
@@ -228,9 +228,12 @@ class _WishartLinearOperator(distribution.Distribution):
     # Complexity: O(nbk)
     # This parametrization is equivalent to Chi2, i.e.,
     # ChiSquared(k) == Gamma(alpha=k/2, beta=1/2)
+    expanded_df = self.df * array_ops.ones(
+        self.scale_operator.batch_shape_tensor(),
+        dtype=self.df.dtype.base_dtype)
     g = random_ops.random_gamma(shape=[n],
                                 alpha=self._multi_gamma_sequence(
-                                    0.5 * self.df, self.dimension),
+                                    0.5 * expanded_df, self.dimension),
                                 beta=0.5,
                                 dtype=self.dtype,
                                 seed=distribution_util.gen_new_seed(
@@ -527,8 +530,8 @@ class WishartCholesky(_WishartLinearOperator):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    parameters = locals()
-    with ops.name_scope(name, values=[scale]):
+    parameters = dict(locals())
+    with ops.name_scope(name, values=[scale]) as name:
       with ops.name_scope("init", values=[scale]):
         scale = ops.convert_to_tensor(scale)
         if validate_args:
@@ -643,8 +646,8 @@ class WishartFull(_WishartLinearOperator):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    parameters = locals()
-    with ops.name_scope(name) as ns:
+    parameters = dict(locals())
+    with ops.name_scope(name) as name:
       with ops.name_scope("init", values=[scale]):
         scale = ops.convert_to_tensor(scale)
         if validate_args:
@@ -663,5 +666,5 @@ class WishartFull(_WishartLinearOperator):
         cholesky_input_output_matrices=cholesky_input_output_matrices,
         validate_args=validate_args,
         allow_nan_stats=allow_nan_stats,
-        name=ns)
+        name=name)
     self._parameters = parameters

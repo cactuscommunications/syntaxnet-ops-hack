@@ -14,8 +14,8 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/core/framework/partial_tensor_shape.h"
 #include "tensorflow/core/framework/tensor.h"
-#include "tensorflow/core/kernels/batch_util.h"
 #include "tensorflow/core/kernels/data/dataset.h"
+#include "tensorflow/core/util/batch_util.h"
 
 namespace tensorflow {
 
@@ -61,7 +61,7 @@ class BatchDatasetOp : public UnaryDatasetOpKernel {
 
     ~Dataset() override { input_->Unref(); }
 
-    std::unique_ptr<IteratorBase> MakeIterator(
+    std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
       return std::unique_ptr<IteratorBase>(new Iterator(
           Iterator::Params{this, strings::StrCat(prefix, "::Batch")}));
@@ -75,7 +75,7 @@ class BatchDatasetOp : public UnaryDatasetOpKernel {
       return output_shapes_;
     }
 
-    string DebugString() override {
+    string DebugString() const override {
       return strings::StrCat("BatchDatasetOp(", batch_size_, ")::Dataset");
     }
 
@@ -92,12 +92,14 @@ class BatchDatasetOp : public UnaryDatasetOpKernel {
     }
 
    private:
-
     class Iterator : public DatasetIterator<Dataset> {
      public:
       explicit Iterator(const Params& params)
-          : DatasetIterator<Dataset>(params),
-            input_impl_(params.dataset->input_->MakeIterator(params.prefix)) {}
+          : DatasetIterator<Dataset>(params) {}
+
+      Status Initialize(IteratorContext* ctx) override {
+        return dataset()->input_->MakeIterator(ctx, prefix(), &input_impl_);
+      }
 
       Status GetNextInternal(IteratorContext* ctx,
                              std::vector<Tensor>* out_tensors,
@@ -145,7 +147,7 @@ class BatchDatasetOp : public UnaryDatasetOpKernel {
           const Tensor& first_element = batch_elements[0][component_index];
           TensorShape batch_component_shape({num_batch_elements});
           batch_component_shape.AppendShape(first_element.shape());
-          Tensor batch_component(cpu_allocator(), first_element.dtype(),
+          Tensor batch_component(ctx->allocator({}), first_element.dtype(),
                                  batch_component_shape);
           // Build the output tuple component by copying one slice
           // from each input element in the batch.
@@ -182,7 +184,7 @@ class BatchDatasetOp : public UnaryDatasetOpKernel {
         return Status::OK();
       }
 
-      Status RestoreInternal(OpKernelContext* ctx,
+      Status RestoreInternal(IteratorContext* ctx,
                              IteratorStateReader* reader) override {
         mutex_lock l(mu_);
         if (!reader->Contains(full_name("input_impl_empty"))) {

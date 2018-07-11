@@ -33,11 +33,15 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/buffer_assignment.h"
 #include "tensorflow/compiler/xla/service/buffer_liveness.h"
 #include "tensorflow/compiler/xla/service/call_inliner.h"
+#include "tensorflow/compiler/xla/service/conditional_simplifier.h"
 #include "tensorflow/compiler/xla/service/dot_decomposer.h"
 #include "tensorflow/compiler/xla/service/flatten_call_graph.h"
-#include "tensorflow/compiler/xla/service/gpu/convolution_folding.h"
+#include "tensorflow/compiler/xla/service/gather_expander.h"
 #include "tensorflow/compiler/xla/service/gpu/cudnn_batchnorm_rewriter.h"
+#include "tensorflow/compiler/xla/service/gpu/cudnn_convolution_algorithm_picker.h"
+#include "tensorflow/compiler/xla/service/gpu/cudnn_convolution_rewriter.h"
 #include "tensorflow/compiler/xla/service/gpu/fusion_merger.h"
+#include "tensorflow/compiler/xla/service/gpu/gpu_constants.h"
 #include "tensorflow/compiler/xla/service/gpu/gpu_copy_insertion.h"
 #include "tensorflow/compiler/xla/service/gpu/gpu_executable.h"
 #include "tensorflow/compiler/xla/service/gpu/gpu_hlo_support_checker.h"
@@ -45,8 +49,8 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/gpu/hlo_schedule.h"
 #include "tensorflow/compiler/xla/service/gpu/instruction_fusion.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
-#include "tensorflow/compiler/xla/service/gpu/ir_emitter.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emitter_context.h"
+#include "tensorflow/compiler/xla/service/gpu/ir_emitter_unnested.h"
 #include "tensorflow/compiler/xla/service/gpu/llvm_gpu_backend/gpu_backend_lib.h"
 #include "tensorflow/compiler/xla/service/gpu/pad_insertion.h"
 #include "tensorflow/compiler/xla/service/gpu/partition_assignment.h"
@@ -57,6 +61,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/hlo_constant_folding.h"
 #include "tensorflow/compiler/xla/service/hlo_cse.h"
 #include "tensorflow/compiler/xla/service/hlo_dce.h"
+#include "tensorflow/compiler/xla/service/hlo_element_type_converter.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_pass_fix.h"
 #include "tensorflow/compiler/xla/service/hlo_pass_pipeline.h"
@@ -68,6 +73,8 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/reshape_mover.h"
 #include "tensorflow/compiler/xla/service/transpose_folding.h"
 #include "tensorflow/compiler/xla/service/tuple_simplifier.h"
+#include "tensorflow/compiler/xla/service/while_loop_constant_sinking.h"
+#include "tensorflow/compiler/xla/service/while_loop_invariant_code_motion.h"
 #include "tensorflow/compiler/xla/service/while_loop_simplifier.h"
 #include "tensorflow/compiler/xla/service/zero_sized_hlo_elimination.h"
 #include "tensorflow/compiler/xla/status_macros.h"
@@ -86,8 +93,6 @@ limitations under the License.
 #include "tensorflow/core/platform/tracing.h"
 #include "tensorflow/stream_executor/cuda/cuda_diagnostics.h"
 
-namespace se = ::perftools::gputools;
-
 namespace xla {
 namespace gpu {
 
@@ -97,15 +102,7 @@ namespace gpu {
 
 namespace {
 
-using tensorflow::port::Tracing;
-using tensorflow::strings::StrCat;
-
-// Any address of a variable residing in global memory or returned by one of the
-// memory allocation routines from the driver or runtime API is always aligned
-// to at least 256 bytes.
-//
-// http://docs.nvidia.com/cuda/cuda-c-programming-guide/#device-memory-accesses
-constexpr int64 kMemoryAlignment = 256;
+namespace tracing = tensorflow::tracing;
 
 // Returns the directory containing nvvm libdevice files.  config_cuda_data_dir
 // should be equal to config().debug_options().xla_gpu_cuda_data_dir() of the
@@ -133,12 +130,11 @@ string GetLibdeviceDir(const string& config_cuda_data_dir) {
 }
 
 // Runs optimization passes on the given HLO module.
-tensorflow::Status OptimizeHloModule(
-    HloModule* hlo_module,
-    const HloCostAnalysis::ShapeSizeFunction& shape_size_function) {
+Status OptimizeHloModule(HloModule* hlo_module, se::StreamExecutor* stream_exec,
+                         DeviceMemoryAllocator* device_allocator) {
   {
     HloPassPipeline pipeline("optimization");
-    pipeline.AddInvariantChecker<HloVerifier>(shape_size_function);
+    pipeline.AddInvariantChecker<HloVerifier>();
     pipeline.AddPass<GpuHloSupportChecker>();
     ReducePrecisionInsertion::AddPasses(
         &pipeline, hlo_module->config().debug_options(),
@@ -146,11 +142,16 @@ tensorflow::Status OptimizeHloModule(
 
     // TODO(b/64094172): make Call work on GPU instead of inlining.
     pipeline.AddPass<CallInliner>();
+    // Convert BF16 operations to F32 operations so that the GPU backend can
+    // support BF16 operations without directly implementing a BF16 lowering for
+    // most ops.
+    pipeline.AddPass<HloElementTypeConverter>(BF16, F32);
     pipeline.AddPass<DotDecomposer>();
+
     {
       auto& pass =
           pipeline.AddPass<HloPassFix<HloPassPipeline>>("simplification");
-      pass.AddInvariantChecker<HloVerifier>(shape_size_function);
+      pass.AddInvariantChecker<HloVerifier>();
 
       // If cudnn batchnorms are enabled, rewrite batchnorm HLOs to cudnn calls
       // where possible.  Not every batchnorm op can be implemented as a call to
@@ -158,11 +159,16 @@ tensorflow::Status OptimizeHloModule(
       if (hlo_module->config().debug_options().xla_gpu_use_cudnn_batchnorm()) {
         pass.AddPass<CudnnBatchNormRewriter>();
       }
+      // TODO(kramerb): Remove use_fusion once instruction fusion can create
+      // multi-output fusions from the unfused expander output.
       pass.AddPass<BatchNormExpander>(
           /*rewrite_training_op=*/true,
           /*rewrite_inference_op=*/true,
           /*rewrite_grad_op=*/true,
-          /*use_fusion=*/false);
+          /*use_fusion=*/true);
+
+      // Rewrite gather ops into smaller ones.
+      pass.AddPass<GatherExpander>();
 
       // BatchNormExpander can create zero-sized ops, so zero-sized HLO
       // elimination has to come after that pass.
@@ -172,12 +178,14 @@ tensorflow::Status OptimizeHloModule(
           /*is_layout_sensitive=*/false,
           [](const Shape&, const Shape&) { return false; });
       pass.AddPass<TupleSimplifier>();
+      pass.AddPass<WhileLoopConstantSinking>();
       pass.AddPass<WhileLoopSimplifier>();
       pass.AddPass<HloDCE>();
       pass.AddPass<ReshapeMover>();
       pass.AddPass<HloConstantFolding>();
+      pass.AddPass<ConditionalSimplifier>();
     }
-    pipeline.AddPass<ConvolutionFolding>();
+
     pipeline.AddPass<TransposeFolding>(
         [](const HloInstruction& dot,
            const TransposeFolding::OperandIndices& candidate_operands) {
@@ -189,16 +197,74 @@ tensorflow::Status OptimizeHloModule(
     pipeline.AddPass<HloDCE>();
     TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
   }
+
+  {
+    // Convert convolutions into CustomCalls to cudnn, then canonicalize them
+    // (PadInsertion).
+    HloPassPipeline pipeline("conv_canonicalization");
+    pipeline.AddInvariantChecker<HloVerifier>();
+    pipeline.AddPass<CudnnConvolutionRewriter>();
+    pipeline.AddPass<PadInsertion>();
+    TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
+  }
+
+  {
+    HloPassPipeline pipeline("layout_assignment");
+    pipeline.AddPass<GpuLayoutAssignment>(
+        hlo_module->mutable_device_entry_computation_layout(), stream_exec);
+
+    // The LayoutAssignment pass may leave behind kCopy instructions which are
+    // duplicate or NOPs, so remove them with algebraic simplification and CSE.
+    pipeline.AddPass<HloPassFix<AlgebraicSimplifier>>(
+        /*is_layout_sensitive=*/true,
+        /*valid_bitcast_callback=*/[](const Shape&, const Shape&) {
+          return true;
+        });
+
+    // Choose the fastest algorithm for each conv.
+    //
+    // We pick the algorithm before fusion so we can generate better HLO. After
+    // CudnnConvolutionRewriter, our convolutions are CustomCalls which return a
+    // tuple (conv_result, scratch_memory), and the each conv uses 0 bytes of
+    // scratch:
+    //
+    //   customcall = (f32[...], f32[0])
+    //   return gte(customcall, 0)
+    //
+    // The algorithm picker then chooses the best algorithm, and potentially
+    // increases the scratch space.  It replaces customcall with new_tuple,
+    // giving us the following:
+    //
+    //   new_customcall = (f32[...], f32[N])
+    //   new_tuple = tuple(gte(new_customcall, 0), constant f32[0])
+    //   return gte(new_tuple, 0)
+    //
+    // The new tuple and gte instructions then be simplified away, because
+    // nobody is expected to use the scratch value.
+    //
+    // However, if we were to run CudnnConvolutionAlgorithmPicker after fusion
+    // the gte(customcall, 0) would probably already be into a fusion node.  We
+    // can't simplify across HloComputation boundaries, so in this case we
+    // wouldn't be able to simplify away the new_tuple bits.
+    pipeline.AddPass<CudnnConvolutionAlgorithmPicker>(stream_exec,
+                                                      device_allocator);
+    // Clean up new_tuple described above.
+    pipeline.AddPass<TupleSimplifier>();
+
+    pipeline.AddPass<HloCSE>(/*is_layout_sensitive=*/true);
+    TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
+  }
+
   {
     HloPassFix<HloPassPipeline> fusion("fusion");
-    fusion.AddInvariantChecker<HloVerifier>(shape_size_function);
+    fusion.AddInvariantChecker<HloVerifier>();
     fusion.AddPass<GpuInstructionFusion>(/*may_duplicate=*/false);
     fusion.AddPass<GpuInstructionFusion>(/*may_duplicate=*/true);
     fusion.AddPass<FusionMerger>();
     TF_RETURN_IF_ERROR(fusion.Run(hlo_module).status());
 
     HloPassPipeline reduce_pipeline("reduce-precision");
-    reduce_pipeline.AddInvariantChecker<HloVerifier>(shape_size_function);
+    reduce_pipeline.AddInvariantChecker<HloVerifier>();
     ReducePrecisionInsertion::AddPasses(
         &reduce_pipeline, hlo_module->config().debug_options(),
         ReducePrecisionInsertion::PassTiming::AFTER_FUSION);
@@ -211,30 +277,29 @@ tensorflow::Status OptimizeHloModule(
       TF_RETURN_IF_ERROR(fusion.Run(hlo_module).status());
     }
   }
-  return tensorflow::Status::OK();
+
+  {
+    // Do an aggressive LICM pass over while loops.  In particular, this hoists
+    // constants that were sunk by WhileLoopConstantSinking.  Leaving them in
+    // the while loop may result in unnecessary copies.
+    HloPassPipeline pipeline("while-loop-licm");
+    pipeline.AddPass<WhileLoopInvariantCodeMotion>(true);
+    TF_RETURN_IF_ERROR(pipeline.Run(hlo_module).status());
+  }
+  return Status::OK();
 }
 
 // Modifies the given HLO module so that it will be accepted by IrEmitter.
 // Unlike optimization passes, the passes are necessary for correctness.
-tensorflow::Status PrepareHloModuleForIrEmitting(
-    HloModule* hlo_module,
-    const HloCostAnalysis::ShapeSizeFunction& shape_size_function) {
+Status PrepareHloModuleForIrEmitting(HloModule* hlo_module) {
   // In some cases, we have to place the result of an instruction in a temporary
   // buffer. For instance, the buffer that holds an external parameter is
   // assumed immutable at this point, and should not be reused for output
   // (b/27180329). Therefore, in that case, we set the output to be a copy of
   // the parameter.
   HloPassPipeline pipeline("GPU-ir-emit-prepare");
-  pipeline.AddInvariantChecker<HloVerifier>(shape_size_function);
-  pipeline.AddPass<PadInsertion>();
-  pipeline.AddPass<GpuLayoutAssignment>(
-      hlo_module->mutable_entry_computation_layout());
-  // The LayoutAssignment pass may leave behind kCopy instructions which are
-  // duplicate or NOPs, so remove them with algebraic simplification and CSE.
-  pipeline.AddPass<HloPassFix<AlgebraicSimplifier>>(
-      /*is_layout_sensitive=*/true,
-      [](const Shape&, const Shape&) { return true; });
-  pipeline.AddPass<HloCSE>(/*is_layout_sensitive=*/true);
+  pipeline.AddInvariantChecker<HloVerifier>();
+
   // Copy insertion should be performed immediately before IR emission to avoid
   // inserting unnecessary copies (later pass adds an instruction which
   // materializes the value) or missing a necessary copy (later pass removes an
@@ -281,25 +346,27 @@ void WarnIfBadPtxasVersion(const string& ptxas_path) {
 
   int64 vmaj, vmin, vdot;
   string vmaj_str, vmin_str, vdot_str;
-  using tensorflow::strings::safe_strto64;
   if (!RE2::PartialMatch(out, R"(\bV(\d+)\.(\d+)\.(\d+)\b)", &vmaj_str,
                          &vmin_str, &vdot_str) ||
-      !safe_strto64(vmaj_str, &vmaj) || !safe_strto64(vmin_str, &vmin) ||
-      !safe_strto64(vdot_str, &vdot)) {
+      !tensorflow::strings::safe_strto64(vmaj_str, &vmaj) ||
+      !tensorflow::strings::safe_strto64(vmin_str, &vmin) ||
+      !tensorflow::strings::safe_strto64(vdot_str, &vdot)) {
     LOG(WARNING) << "Couldn't parse ptxas version in output of " << ptxas_path
                  << " --version:\n"
                  << out;
     return;
   }
 
-  // ptxas 9.0 before 9.0.276 miscompiles some address calculations with large
-  // offsets (e.g. "load ptr + large_constant"), b/70245379.
-  if (vmaj == 9 && vmin == 0 && vdot < 276) {
+  // ptxas 9.0 before 9.0.276 and ptxas 9.1 before 9.1.121 miscompile some
+  // address calculations with large offsets (e.g. "load ptr + large_constant"),
+  // b/70245379.
+  if ((vmaj == 9 && vmin == 0 && vdot < 276) ||
+      (vmaj == 9 && vmin == 1 && vdot < 121)) {
     LOG(WARNING) << "*** WARNING *** You are using ptxas " << vmaj << "."
                  << vmin << "." << vdot
-                 << ", which is in range [9.0.0, 9.0.276). These versions are "
-                    "known to miscompile XLA code, leading to incorrect "
-                    "results or invalid-address errors.";
+                 << ", which is in range [9.0.0, 9.0.276) + [9.1.0, 9.1.121). "
+                    "These versions are known to miscompile XLA code, leading "
+                    "to incorrect results or invalid-address errors.";
   }
 }
 
@@ -320,16 +387,24 @@ void WarnIfBadDriverJITVersion() {
     }
     se::cuda::DriverVersion version = version_or_status.ValueOrDie();
 
-    // The driver JIT in 384 before 384.108 miscompiles some address
+    // The following versions of the driver JIT miscompile some address
     // calculations with large offsets (e.g. "load ptr + large_constant"),
-    // b/70245379.
-    if (std::get<0>(version) == 384 && std::get<1>(version) < 108) {
+    // b/70245379:
+    //
+    //  - 384.x before 384.108
+    //  - 387.x before 387.40
+    //  - 390.x before 390.10.
+    auto vmaj = std::get<0>(version);
+    auto vmin = std::get<1>(version);
+    if ((vmaj == 384 && vmin < 108) ||  //
+        (vmaj == 387 && vmin < 40) ||   //
+        (vmaj == 390 && vmin < 10)) {
       LOG(WARNING)
           << "*** WARNING *** Invoking the PTX->SASS JIT from driver version "
           << se::cuda::DriverVersionToString(version)
-          << ", which is in range [384.0.0, 384.108.0). These versions are "
-             "known to miscompile XLA code, leading to incorrect results or "
-             "invalid-address errors.";
+          << ", which is in range [384.0.0, 384.108.0) + [387.0.0, 387.40.0) + "
+             "[390.0.0, 390.10.0). These versions are known to miscompile XLA "
+             "code, leading to incorrect results or invalid-address errors.";
     }
   });
 }
@@ -338,7 +413,7 @@ void WarnIfBadDriverJITVersion() {
 // code (i.e. a cubin) as a byte array.
 StatusOr<std::vector<uint8>> CompilePtx(const string& ptx, int cc_major,
                                         int cc_minor) {
-  Tracing::TraceMe annotation("Compile PTX", /*is_expensive=*/true);
+  tracing::ScopedActivity activity("Compile PTX", /*is_expensive=*/true);
   const string ptxas_path =
       tensorflow::io::JoinPath(tensorflow::CudaRoot(), "bin", "ptxas");
   VLOG(2) << "Using ptxas at " << ptxas_path;
@@ -370,8 +445,9 @@ StatusOr<std::vector<uint8>> CompilePtx(const string& ptx, int cc_major,
     tensorflow::Env::Default()->DeleteFile(cubin_path).IgnoreError();
   });
   tensorflow::SubProcess ptxas_info_dumper;
-  std::vector<string> ptxas_args = {ptxas_path, ptx_path, "-o", cubin_path,
-                                    StrCat("-arch=sm_", cc_major, cc_minor)};
+  std::vector<string> ptxas_args = {
+      ptxas_path, ptx_path, "-o", cubin_path,
+      tensorflow::strings::StrCat("-arch=sm_", cc_major, cc_minor)};
   if (VLOG_IS_ON(2)) {
     ptxas_args.push_back("-v");
   }
@@ -405,22 +481,24 @@ GpuCompiler::GpuCompiler()
                         .getPointerSize(0 /* default address space */)) {}
 
 StatusOr<std::unique_ptr<HloModule>> GpuCompiler::RunHloPasses(
-    std::unique_ptr<HloModule> module, se::StreamExecutor* /*stream_exec*/) {
+    std::unique_ptr<HloModule> module, se::StreamExecutor* stream_exec,
+    DeviceMemoryAllocator* device_allocator) {
   XLA_SCOPED_LOGGING_TIMER("GpuCompiler::RunHloPasses");
-  Tracing::TraceMe annotation("HLO Transforms", module->name(),
-                              /*is_expensive=*/true);
-  TF_RETURN_IF_ERROR(OptimizeHloModule(module.get(), ShapeSizeBytesFunction()));
+  tracing::ScopedActivity activity("HLO Transforms", module->name(),
+                                   /*is_expensive=*/true);
+  TF_RETURN_IF_ERROR(
+      OptimizeHloModule(module.get(), stream_exec, device_allocator));
   return std::move(module);
 }
 
 StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
-    std::unique_ptr<HloModule> module, se::StreamExecutor* stream_exec) {
+    std::unique_ptr<HloModule> module, se::StreamExecutor* stream_exec,
+    DeviceMemoryAllocator* device_allocator) {
   XLA_SCOPED_LOGGING_TIMER("GpuCompiler::RunBackend");
 
   TF_RET_CHECK(stream_exec != nullptr);
 
-  TF_RETURN_IF_ERROR(
-      PrepareHloModuleForIrEmitting(module.get(), ShapeSizeBytesFunction()));
+  TF_RETURN_IF_ERROR(PrepareHloModuleForIrEmitting(module.get()));
 
   llvm::LLVMContext llvm_context;
   std::string buffer;
@@ -451,19 +529,21 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
   TF_ASSIGN_OR_RETURN(
       std::unique_ptr<BufferAssignment> buffer_assignment,
       BufferAssigner::Run(module.get(), hlo_schedule->ConsumeHloOrdering(),
-                          BufferSizeBytesFunction(), [](LogicalBuffer::Color) {
-                            return kMemoryAlignment;
+                          BufferSizeBytesFunction(),
+                          /*color_alignment=*/[](LogicalBuffer::Color) {
+                            return kCudaMallocAlignBytes;
                           }));
-  // BufferAssignment::ToString() includes a header, so no need for us to
-  // print one ourselves.
+  // BufferAssignment::Stats::ToString() and BufferAssignment::ToString()
+  // include headers, so no need for us to print them ourselves.
+  XLA_VLOG_LINES(1, buffer_assignment->GetStats().ToString());
   XLA_VLOG_LINES(2, buffer_assignment->ToString());
   XLA_VLOG_LINES(2, module->ToString());
-  const string xla_dump_hlo_proto_to =
-      module->config().debug_options().xla_dump_hlo_proto_to();
-  if (!xla_dump_hlo_proto_to.empty()) {
+  const string xla_dump_optimized_hlo_proto_to =
+      module->config().debug_options().xla_dump_optimized_hlo_proto_to();
+  if (!xla_dump_optimized_hlo_proto_to.empty()) {
     HloProto proto = MakeHloProto(*module, *buffer_assignment);
     TF_RETURN_IF_ERROR(protobuf_util::DumpProtoToDirectory(
-        proto, xla_dump_hlo_proto_to, module->name()));
+        proto, xla_dump_optimized_hlo_proto_to, module->name()));
   }
 
   IrEmitterContext ir_emitter_context(module.get(), buffer_assignment.get(),
@@ -565,7 +645,7 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
   // Write PTX to IR dump directory, if IR dumping was requested.
   if (!ir_dump_directory.empty()) {
     const string ptx_outfile = tensorflow::io::JoinPath(
-        ir_dump_directory, StrCat(module->name(), ".ptx"));
+        ir_dump_directory, tensorflow::strings::StrCat(module->name(), ".ptx"));
     auto status = [&] {
       auto* env = tensorflow::Env::Default();
       TF_RETURN_IF_ERROR(env->RecursivelyCreateDir(ir_dump_directory));
@@ -588,14 +668,16 @@ StatusOr<std::unique_ptr<Executable>> GpuCompiler::RunBackend(
   XLA_VLOG_LINES(2, thunk_schedule->ToString());
 
   std::unique_ptr<HloProfileIndexMap> profile_index_map;
-  std::unique_ptr<HloProfilePrinter> profile_printer;
+  std::unique_ptr<HloProfilePrinterData> profile_printer;
 
   if (module->config().hlo_profiling_enabled()) {
     HloCostAnalysis cost_analysis(ShapeSizeBytesFunction());
+    cost_analysis.set_bytes_per_second(
+        stream_exec->GetDeviceDescription().memory_bandwidth());
     TF_RETURN_IF_ERROR(module->entry_computation()->Accept(&cost_analysis));
     profile_index_map = MakeUnique<HloProfileIndexMap>(*module);
     profile_printer =
-        CreateHloProfilePrinter(*profile_index_map, cost_analysis);
+        CreateHloProfilePrinterData(*profile_index_map, cost_analysis);
   }
 
   auto* gpu_executable = new GpuExecutable(
@@ -613,7 +695,7 @@ std::vector<uint8> GpuCompiler::CompilePtxOrGetCachedResult(const string& ptx,
                                                             int cc_major,
                                                             int cc_minor) {
   XLA_SCOPED_LOGGING_TIMER("GpuCompiler::CompilePtxOrGetCachedResult");
-  Tracing::TraceMe annotation("PTX->CUBIN", /*is_expensive=*/true);
+  tracing::ScopedActivity activity("PTX->CUBIN", /*is_expensive=*/true);
   bool inserted;
   decltype(compilation_cache_.begin()) iter;
   // Pointers into compilation_cache_ where the ptx and (optional) cubin are
@@ -698,9 +780,9 @@ se::Platform::Id GpuCompiler::PlatformId() const {
 }  // namespace xla
 
 static bool InitModule() {
-  xla::Compiler::RegisterCompilerFactory(se::cuda::kCudaPlatformId, []() {
-    return xla::MakeUnique<xla::gpu::GpuCompiler>();
-  });
+  xla::Compiler::RegisterCompilerFactory(
+      stream_executor::cuda::kCudaPlatformId,
+      []() { return xla::MakeUnique<xla::gpu::GpuCompiler>(); });
   return true;
 }
 static bool module_initialized = InitModule();

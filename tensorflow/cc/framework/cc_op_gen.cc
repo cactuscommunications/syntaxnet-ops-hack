@@ -28,6 +28,7 @@ limitations under the License.
 #include "tensorflow/core/framework/types.pb_text.h"
 #include "tensorflow/core/lib/gtl/map_util.h"
 #include "tensorflow/core/lib/gtl/stl_util.h"
+#include "tensorflow/core/lib/hash/hash.h"
 #include "tensorflow/core/lib/strings/str_util.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/env.h"
@@ -439,7 +440,7 @@ string AvoidCPPKeywords(StringPiece name) {
   if (IsCPPKeyword(name)) {
     return strings::StrCat(name, "_");
   }
-  return name.ToString();
+  return std::string(name);
 }
 
 void InferArgAttributes(const OpDef::ArgDef& arg,
@@ -697,7 +698,8 @@ string OpInfo::GetOpAttrStruct() const {
     attr_comment = MakeComment(attr_comment, "    ");
 
     strings::StrAppend(&setters, attr_comment);
-    strings::StrAppend(&setters, "    Attrs ", attr_func_def, " x) {\n");
+    strings::StrAppend(&setters, "    TF_MUST_USE_RESULT Attrs ", attr_func_def,
+                       " x) {\n");
     strings::StrAppend(&setters, "      Attrs ret = *this;\n");
     strings::StrAppend(&setters, "      ret.", api_def_attr.rename_to(),
                        "_ = x;\n");

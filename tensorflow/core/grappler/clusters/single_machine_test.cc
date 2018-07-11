@@ -196,10 +196,19 @@ TEST_F(SingleMachineTest, GraphOptimizations) {
   TF_CHECK_OK(cluster_->Run(item.graph, item.feed, item.fetch, &metadata));
   std::set<string> cost_nodes;
   for (const auto& node : metadata.cost_graph().node()) {
+#ifdef INTEL_MKL
+    // Skip the special nodes inserted by TF (and MKL): these are either
+    // prefixed with an underscore or contain "/_".
+    if (node.name()[0] == '_' || node.name().find("/_") != string::npos) {
+      continue;
+    }
+    cost_nodes.insert(node.name());
+#else
     // Skip nodes added by TF internally.
     if (node.name()[0] != '_') {
       cost_nodes.insert(node.name());
     }
+#endif
   }
   const std::set<string> expected_cost_nodes = {
       "zero",      "one",      "add",         "square",
@@ -467,13 +476,11 @@ TEST_F(SingleMachineTest, PersistentMemory) {
       found_hashtable = true;
       // Persistent memory usage should be 0 since it's recorded as part of the
       // initialize_table op.
-      EXPECT_EQ(0, node.host_persistent_memory_size());
-      EXPECT_EQ(0, node.device_persistent_memory_size());
+      EXPECT_EQ(0, node.persistent_memory_size());
     } else if (node.name() == "initialize_table") {
       found_table_init = true;
       // Persistent memory should hold 2 keys and 2 values.
-      EXPECT_LE(4 * sizeof(int64), node.host_persistent_memory_size());
-      EXPECT_EQ(0, node.device_persistent_memory_size());
+      EXPECT_LE(4 * sizeof(int64), node.persistent_memory_size());
     }
   }
   EXPECT_TRUE(found_table_init);

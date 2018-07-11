@@ -18,7 +18,6 @@ from __future__ import division
 from __future__ import print_function
 
 import abc
-import collections
 import threading
 
 import numpy as np
@@ -26,23 +25,26 @@ import six
 
 from tensorflow.python.data.ops import iterator_ops
 from tensorflow.python.data.util import nest
+from tensorflow.python.data.util import random_seed
 from tensorflow.python.data.util import sparse
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import function
 from tensorflow.python.framework import ops
-from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import sparse_tensor as sparse_tensor_lib
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import tensor_util
+from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gen_dataset_ops
 from tensorflow.python.ops import gen_io_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import script_ops
 from tensorflow.python.util import deprecation
+from tensorflow.python.util.tf_export import tf_export
 
 
+@tf_export("data.Dataset")
 class Dataset(object):
   """Represents a potentially large set of elements.
 
@@ -88,7 +90,7 @@ class Dataset(object):
     Raises:
       RuntimeError: If eager execution is enabled.
     """
-    if context.in_eager_mode():
+    if context.executing_eagerly():
       raise RuntimeError(
           "dataset.make_initializable_iterator is not supported when eager "
           "execution is enabled.")
@@ -108,6 +110,24 @@ class Dataset(object):
                                  self.output_types, self.output_shapes,
                                  self.output_classes)
 
+  def __iter__(self):
+    """Creates an `Iterator` for enumerating the elements of this dataset.
+
+    The returned iterator implements the Python iterator protocol and therefore
+    can only be used in eager mode.
+
+    Returns:
+      An `Iterator` over the elements of this dataset.
+
+    Raises:
+      RuntimeError: If eager execution is not enabled.
+    """
+    if context.executing_eagerly():
+      return iterator_ops.EagerIterator(self)
+    else:
+      raise RuntimeError("dataset.__iter__() is only supported when eager "
+                         "execution is enabled.")
+
   def make_one_shot_iterator(self):
     """Creates an `Iterator` for enumerating the elements of this dataset.
 
@@ -116,14 +136,9 @@ class Dataset(object):
 
     Returns:
       An `Iterator` over the elements of this dataset.
-
-    Raises:
-      RuntimeError: If eager execution is enabled.
     """
-    if context.in_eager_mode():
-      raise RuntimeError(
-          "dataset.make_one_shot_iterator is not supported when eager "
-          "execution is enabled.")
+    if context.executing_eagerly():
+      return iterator_ops.EagerIterator(self)
     # NOTE(mrry): We capture by value here to ensure that `_make_dataset()` is
     # a 0-argument function.
     @function.Defun(capture_by_value=True)
@@ -197,11 +212,18 @@ class Dataset(object):
   def from_tensors(tensors):
     """Creates a `Dataset` with a single element, comprising the given tensors.
 
+    Note that if `tensors` contains a NumPy array, and eager execution is not
+    enabled, the values will be embedded in the graph as one or more
+    @{tf.constant} operations. For large datasets (> 1 GB), this can waste
+    memory and run into byte limits of graph serialization.  If tensors contains
+    one or more large NumPy arrays, consider the alternative described in
+    @{$guide/datasets#consuming_numpy_arrays$this guide}.
+
     Args:
       tensors: A nested structure of tensors.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return TensorDataset(tensors)
 
@@ -209,12 +231,19 @@ class Dataset(object):
   def from_tensor_slices(tensors):
     """Creates a `Dataset` whose elements are slices of the given tensors.
 
+    Note that if `tensors` contains a NumPy array, and eager execution is not
+    enabled, the values will be embedded in the graph as one or more
+    @{tf.constant} operations. For large datasets (> 1 GB), this can waste
+    memory and run into byte limits of graph serialization.  If tensors contains
+    one or more large NumPy arrays, consider the alternative described in
+    @{$guide/datasets#consuming_numpy_arrays$this guide}.
+
     Args:
       tensors: A nested structure of tensors, each having the same size in the
         0th dimension.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return TensorSliceDataset(tensors)
 
@@ -227,7 +256,7 @@ class Dataset(object):
       sparse_tensor: A `tf.SparseTensor`.
 
     Returns:
-      A `Dataset` of rank-(N-1) sparse tensors.
+      Dataset: A `Dataset` of rank-(N-1) sparse tensors.
     """
     return SparseTensorSliceDataset(sparse_tensor)
 
@@ -243,25 +272,32 @@ class Dataset(object):
       self._generator = generator
       self._lock = threading.Lock()
       self._next_id = 0  # GUARDED_BY(self._lock)
-      self._iterators = collections.defaultdict(lambda: iter(generator()))
+      self._args = {}
+      self._iterators = {}
 
-    def get_next_id(self):
+    def get_next_id(self, *args):
       with self._lock:
         ret = self._next_id
         self._next_id += 1
+      self._args[ret] = args
       # NOTE(mrry): Explicitly create an array of `np.int64` because implicit
       # casting in `py_func()` will create an array of `np.int32` on Windows,
       # leading to a runtime error.
       return np.array(ret, dtype=np.int64)
 
     def get_iterator(self, iterator_id):
-      return self._iterators[iterator_id]
+      try:
+        return self._iterators[iterator_id]
+      except KeyError:
+        iterator = iter(self._generator(*self._args.pop(iterator_id)))
+        self._iterators[iterator_id] = iterator
+        return iterator
 
     def iterator_completed(self, iterator_id):
       del self._iterators[iterator_id]
 
   @staticmethod
-  def from_generator(generator, output_types, output_shapes=None):
+  def from_generator(generator, output_types, output_shapes=None, args=None):
     """Creates a `Dataset` whose elements are generated by `generator`.
 
     The `generator` argument must be a callable object that returns
@@ -304,16 +340,20 @@ class Dataset(object):
     `Dataset.from_generator()`.
 
     Args:
-      generator: A callable object that takes no arguments and returns an
-        object that supports the `iter()` protocol.
+      generator: A callable object that returns an object that supports the
+        `iter()` protocol. If `args` is not specified, `generator` must take
+        no arguments; otherwise it must take as many arguments as there are
+        values in `args`.
       output_types: A nested structure of `tf.DType` objects corresponding to
         each component of an element yielded by `generator`.
       output_shapes: (Optional.) A nested structure of `tf.TensorShape`
         objects corresponding to each component of an element yielded by
         `generator`.
+      args: (Optional.) A tuple of `tf.Tensor` objects that will be evaluated
+        and passed to `generator` as NumPy-array arguments.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     if not callable(generator):
       raise TypeError("`generator` must be callable.")
@@ -323,16 +363,20 @@ class Dataset(object):
     else:
       output_shapes = nest.map_structure_up_to(
           output_types, tensor_shape.as_shape, output_shapes)
+    if args is None:
+      args = ()
+    else:
+      args = tuple(ops.convert_n_to_tensor(args, name="args"))
 
-    flattened_types = nest.flatten(output_types)
+    flattened_types = [dtypes.as_dtype(dt) for dt in nest.flatten(output_types)]
     flattened_shapes = nest.flatten(output_shapes)
 
     generator_state = Dataset._GeneratorState(generator)
 
-    def get_iterator_id_map_fn(unused_dummy):
+    def get_iterator_id_fn(unused_dummy):
       """Creates a unique `iterator_id` for each pass over the dataset.
 
-      The "iterator_id" disambiguates between multiple concurrently
+      The returned `iterator_id` disambiguates between multiple concurrently
       existing iterators.
 
       Args:
@@ -343,9 +387,9 @@ class Dataset(object):
         `generator_state`.
       """
       return script_ops.py_func(
-          generator_state.get_next_id, [], dtypes.int64, stateful=True)
+          generator_state.get_next_id, args, dtypes.int64, stateful=True)
 
-    def generator_map_fn(iterator_id_t):
+    def generator_next_fn(iterator_id_t):
       """Generates the next element from iterator with ID `iterator_id_t`.
 
       We map this function across an infinite repetition of the
@@ -361,11 +405,9 @@ class Dataset(object):
 
       def generator_py_func(iterator_id):
         """A `py_func` that will be called to invoke the iterator."""
-        try:
-          values = next(generator_state.get_iterator(iterator_id))
-        except StopIteration:
-          generator_state.iterator_completed(iterator_id)
-          raise StopIteration("Iteration finished.")
+        # `next()` raises `StopIteration` when there are no more
+        # elements remaining to be generated.
+        values = next(generator_state.get_iterator(iterator_id))
 
         # Use the same _convert function from the py_func() implementation to
         # convert the returned values to arrays early, so that we can inspect
@@ -406,17 +448,31 @@ class Dataset(object):
 
       return nest.pack_sequence_as(output_types, flat_values)
 
+    def finalize_fn(iterator_id_t):
+      """Releases host-side state for the iterator with ID `iterator_id_t`."""
+
+      def finalize_py_func(iterator_id):
+        generator_state.iterator_completed(iterator_id)
+        # We return a dummy value so that the `finalize_fn` has a valid
+        # signature.
+        # NOTE(mrry): Explicitly create an array of `np.int64` because implicit
+        # casting in `py_func()` will create an array of `np.int32` on Windows,
+        # leading to a runtime error.
+        return np.array(0, dtype=np.int64)
+
+      return script_ops.py_func(
+          finalize_py_func, [iterator_id_t], dtypes.int64, stateful=True)
+
     # This function associates each traversal of `generator` with a unique
     # iterator ID.
-    def flat_map_fn(iterator_id_t):
-      # First, generate an infinite dataset containing the iterator ID repeated
-      # forever.
-      repeated_id = Dataset.from_tensors(iterator_id_t).repeat(None)
-
-      # The `generator_map_fn` gets the next element from the iterator with the
-      # relevant ID, and raises StopIteration when that iterator contains no
+    def flat_map_fn(dummy_arg):
+      # The `get_iterator_id_fn` gets a unique ID for the current instance of
+      # of the generator.
+      # The `generator_next_fn` gets the next element from the iterator with the
+      # given ID, and raises StopIteration when that iterator contains no
       # more elements.
-      return repeated_id.map(generator_map_fn)
+      return _GeneratorDataset(dummy_arg, get_iterator_id_fn, generator_next_fn,
+                               finalize_fn)
 
     # A single-element dataset that, each time it is evaluated, contains a
     # freshly-generated and unique (for the returned dataset) int64
@@ -424,7 +480,7 @@ class Dataset(object):
     # is encapsulated in `generator_state`, and captured in
     # `get_iterator_id_map_fn`.
     dummy = 0
-    id_dataset = Dataset.from_tensors(dummy).map(get_iterator_id_map_fn)
+    id_dataset = Dataset.from_tensors(dummy)
 
     # A dataset that contains all of the elements generated by a
     # single iterator created from `generator`, identified by the
@@ -456,7 +512,7 @@ class Dataset(object):
         len(args) == 3 -> start = args[0], stop = args[1, stop = args[2]
 
     Returns:
-      A `RangeDataset`.
+      Dataset: A `RangeDataset`.
 
     Raises:
       ValueError: if len(args) == 0.
@@ -500,7 +556,7 @@ class Dataset(object):
       datasets: A nested structure of datasets.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return ZipDataset(datasets)
 
@@ -526,7 +582,7 @@ class Dataset(object):
       dataset: `Dataset` to be concatenated.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return ConcatenateDataset(self, dataset)
 
@@ -535,16 +591,20 @@ class Dataset(object):
 
     Args:
       buffer_size: A `tf.int64` scalar `tf.Tensor`, representing the
-        maximum number elements that will be buffered when prefetching.
+        maximum number of elements that will be buffered when prefetching.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return PrefetchDataset(self, buffer_size)
 
   @staticmethod
-  def list_files(file_pattern):
+  def list_files(file_pattern, shuffle=None, seed=None):
     """A dataset of all files matching a pattern.
+
+    NOTE: The default behavior of this method is to return filenames in
+    a non-deterministic random shuffled order. Pass a `seed` or `shuffle=False`
+    to get results in a deterministic order.
 
     Example:
       If we had the following files on our filesystem:
@@ -559,11 +619,26 @@ class Dataset(object):
     Args:
       file_pattern: A string or scalar string `tf.Tensor`, representing
         the filename pattern that will be matched.
+      shuffle: (Optional.) If `True`, the file names will be shuffled randomly.
+        Defaults to `True`.
+      seed: (Optional.) A `tf.int64` scalar `tf.Tensor`, representing the
+        random seed that will be used to create the distribution. See
+        @{tf.set_random_seed} for behavior.
 
     Returns:
-     A `Dataset` of strings corresponding to file names.
+     Dataset: A `Dataset` of strings corresponding to file names.
     """
-    return Dataset.from_tensor_slices(gen_io_ops.matching_files(file_pattern))
+    if shuffle is None:
+      shuffle = True
+    matching_files = gen_io_ops.matching_files(file_pattern)
+    dataset = Dataset.from_tensor_slices(matching_files)
+    if shuffle:
+      # NOTE(mrry): The shuffle buffer size must be greater than zero, but the
+      # list of files might be empty.
+      buffer_size = math_ops.maximum(
+          array_ops.shape(matching_files, out_type=dtypes.int64)[0], 1)
+      dataset = dataset.shuffle(buffer_size, seed=seed)
+    return dataset
 
   def repeat(self, count=None):
     """Repeats this dataset `count` times.
@@ -578,7 +653,7 @@ class Dataset(object):
         indefinitely.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return RepeatDataset(self, count)
 
@@ -602,7 +677,7 @@ class Dataset(object):
         iterated over. (Defaults to `True`.)
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return ShuffleDataset(self, buffer_size, seed, reshuffle_each_iteration)
 
@@ -615,7 +690,7 @@ class Dataset(object):
         If a filename is not provided, the dataset will be cached in memory.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return CacheDataset(self, filename)
 
@@ -629,7 +704,7 @@ class Dataset(object):
         dataset, the new dataset will contain all elements of this dataset.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return TakeDataset(self, count)
 
@@ -644,7 +719,7 @@ class Dataset(object):
         is -1, skips the entire dataset.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return SkipDataset(self, count)
 
@@ -679,7 +754,6 @@ class Dataset(object):
     d = d.shard(FLAGS.num_workers, FLAGS.worker_index)
     d = d.repeat(FLAGS.num_epochs)
     d = d.shuffle(FLAGS.shuffle_buffer_size)
-    d = d.repeat()
     d = d.interleave(tf.data.TFRecordDataset,
                      cycle_length=FLAGS.num_readers, block_length=1)
     d = d.map(parser_fn, num_parallel_calls=FLAGS.num_map_threads)
@@ -691,7 +765,7 @@ class Dataset(object):
       index: A `tf.int64` scalar `tf.Tensor`, representing the worker index.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
 
     Raises:
       ValueError: if `num_shards` or `index` are illegal values. Note: error
@@ -724,23 +798,49 @@ class Dataset(object):
   def batch(self, batch_size):
     """Combines consecutive elements of this dataset into batches.
 
+    NOTE: If the number of elements (`N`) in this dataset is not an exact
+    multiple of `batch_size`, the final batch contain smaller tensors with
+    shape `N % batch_size` in the batch dimension. If your program depends on
+    the batches having the same shape, consider using the
+    @{tf.contrib.data.batch_and_drop_remainder} transformation instead.
+
     Args:
       batch_size: A `tf.int64` scalar `tf.Tensor`, representing the number of
         consecutive elements of this dataset to combine in a single batch.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return BatchDataset(self, batch_size)
 
   def padded_batch(self, batch_size, padded_shapes, padding_values=None):
     """Combines consecutive elements of this dataset into padded batches.
 
-    Like `Dataset.dense_to_sparse_batch()`, this method combines
-    multiple consecutive elements of this dataset, which might have
-    different shapes, into a single element. The tensors in the
-    resulting element have an additional outer dimension, and are
-    padded to the respective shape in `padded_shapes`.
+    This transformation combines multiple consecutive elements of the input
+    dataset into a single element. Like @{tf.data.Dataset.batch}, the tensors
+    in the resulting element have an additional outer dimension, which will be
+    `batch_size` for all but the last element, and `N % batch_size` for the
+    last element (where `N` is the number of elements in this dataset). Unlike
+    @{tf.data.Dataset.batch}, the elements may have different shapes for some
+    of their components, and this transformation will pad each component to
+    the respective shape in `padding_shapes`. The `padding_shapes` argument
+    determines the resulting shape for each dimension of each component in an
+    output element:
+
+    * If the dimension is a constant (e.g. `tf.Dimension(37)`), the component
+      will be padded out to that length in that dimension.
+    * If the dimension is unknown (e.g. `tf.Dimension(None)`), the component
+      will be padded out to the maximum length of all elements in that
+      dimension.
+
+    NOTE: If the number of elements (`N`) in this dataset is not an exact
+    multiple of `batch_size`, the final batch contain smaller tensors with
+    shape `N % batch_size` in the batch dimension. If your program depends on
+    the batches having the same shape, consider using the
+    @{tf.contrib.data.padded_batch_and_drop_remainder} transformation instead.
+
+    See also @{tf.contrib.data.dense_to_sparse_batch}, which combines elements
+    that may have different shapes into a @{tf.SparseTensor}.
 
     Args:
       batch_size: A `tf.int64` scalar `tf.Tensor`, representing the number of
@@ -758,12 +858,12 @@ class Dataset(object):
         the empty string for string types.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return PaddedBatchDataset(self, batch_size, padded_shapes, padding_values)
 
   def map(self, map_func, num_parallel_calls=None):
-    """Maps `map_func` across this datset.
+    """Maps `map_func` across this dataset.
 
     Args:
       map_func: A function mapping a nested structure of tensors (having
@@ -774,7 +874,7 @@ class Dataset(object):
         specified, elements will be processed sequentially.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     if num_parallel_calls is None:
       return MapDataset(self, map_func)
@@ -790,7 +890,7 @@ class Dataset(object):
         `Dataset`.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return FlatMapDataset(self, map_func)
 
@@ -859,7 +959,7 @@ class Dataset(object):
         input element before cycling to another input element.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return InterleaveDataset(self, map_func, cycle_length, block_length)
 
@@ -872,7 +972,7 @@ class Dataset(object):
         scalar `tf.bool` tensor.
 
     Returns:
-      A `Dataset`.
+      Dataset: A `Dataset`.
     """
     return FilterDataset(self, predicate)
 
@@ -893,10 +993,11 @@ class Dataset(object):
 
     Args:
       transformation_func: A function that takes one `Dataset` argument and
-        returns a `Dataset`.
+          returns a `Dataset`.
 
     Returns:
-      The `Dataset` returned by applying `transformation_func` to this dataset.
+      Dataset: The `Dataset` returned by applying `transformation_func` to this
+          dataset.
     """
     dataset = transformation_func(self)
     if not isinstance(dataset, Dataset):
@@ -1020,6 +1121,196 @@ class SparseTensorSliceDataset(Dataset):
   @property
   def output_types(self):
     return (dtypes.int64, self._sparse_tensor.dtype, dtypes.int64)
+
+
+class _GeneratorDataset(Dataset):
+  """A `Dataset` that generates elements by invoking a function."""
+
+  def __init__(self, init_args, init_func, next_func, finalize_func):
+    """Constructs a `_GeneratorDataset`.
+
+    Args:
+      init_args: A nested structure representing the arguments to `init_func`.
+      init_func: A TensorFlow function that will be called on `init_args` each
+        time a C++ iterator over this dataset is constructed. Returns a nested
+        structure representing the "state" of the dataset.
+      next_func: A TensorFlow function that will be called on the result of
+        `init_func` to produce each element, and that raises `OutOfRangeError`
+        to terminate iteration.
+      finalize_func: A TensorFlow function that will be called on the result of
+        `init_func` immediately before a C++ iterator over this dataset is
+        destroyed. The return value is ignored.
+    """
+    super(_GeneratorDataset, self).__init__()
+    # These members will be initialized by `tf_init_func`.
+    self._state_classes = None
+    self._state_shapes = None
+    self._state_types = None
+
+    self._init_args = init_args
+
+    init_args_classes = sparse.get_classes(init_args)
+    init_args_shapes = nest.pack_sequence_as(
+        init_args, [t.get_shape() for t in nest.flatten(init_args)])
+    init_args_types = nest.pack_sequence_as(
+        init_args, [t.dtype for t in nest.flatten(init_args)])
+
+    @function.Defun(*nest.flatten(
+        sparse.as_dense_types(init_args_types, init_args_classes)))
+    def tf_init_func(*args):
+      """A wrapper for Defun that facilitates shape inference."""
+      dense_shapes = sparse.as_dense_shapes(init_args_shapes, init_args_classes)
+      for arg, shape in zip(args, nest.flatten(dense_shapes)):
+        arg.set_shape(shape)
+
+      nested_args = nest.pack_sequence_as(init_args_classes, args)
+      nested_args = sparse.deserialize_sparse_tensors(
+          nested_args, init_args_types, init_args_shapes, init_args_classes)
+      if _should_unpack_args(nested_args):
+        ret = init_func(*nested_args)
+      else:
+        ret = init_func(nested_args)
+
+      # If `init_func` returns a list of tensors, `nest.flatten()` and
+      # `ops.convert_to_tensor()` would conspire to attempt to stack
+      # those tensors into a single tensor, because the customized
+      # version of `nest.flatten()` does not recurse into lists. Since
+      # it is more likely that the list arose from returning the
+      # result of an operation (such as `tf.py_func()`) that returns a
+      # list of not-necessarily-stackable tensors, we treat the
+      # returned value is a `tuple` instead. A user wishing to pack
+      # the return value into a single tensor can use an explicit
+      # `tf.stack()` before returning.
+      if isinstance(ret, list):
+        ret = tuple(ret)
+
+      # Convert any `SparseTensorValue`s to `SparseTensor`s and all other
+      # values to tensors.
+      ret = nest.pack_sequence_as(ret, [
+          sparse_tensor_lib.SparseTensor.from_value(t)
+          if sparse_tensor_lib.is_sparse(t) else ops.convert_to_tensor(t)
+          for t in nest.flatten(ret)
+      ])
+
+      self._state_classes = sparse.get_classes(ret)
+      self._state_shapes = nest.pack_sequence_as(
+          ret, [t.get_shape() for t in nest.flatten(ret)])
+      self._state_types = nest.pack_sequence_as(
+          ret, [t.dtype for t in nest.flatten(ret)])
+
+      # Serialize any sparse tensors.
+      ret = nest.pack_sequence_as(
+          ret, [t for t in nest.flatten(sparse.serialize_sparse_tensors(ret))])
+      return nest.flatten(ret)
+
+    self._init_func = tf_init_func
+    self._init_func.add_to_graph(ops.get_default_graph())
+
+    # These members will be initialized by `tf_next_func`.
+    self._output_classes = None
+    self._output_shapes = None
+    self._output_types = None
+
+    @function.Defun(*nest.flatten(
+        sparse.as_dense_types(self._state_types, self._state_classes)))
+    def tf_next_func(*args):
+      """A wrapper for Defun that facilitates shape inference."""
+      # Pass in shape information from the input_dataset.
+      dense_shapes = sparse.as_dense_shapes(self._state_shapes,
+                                            self._state_classes)
+      for arg, shape in zip(args, nest.flatten(dense_shapes)):
+        arg.set_shape(shape)
+
+      nested_args = nest.pack_sequence_as(self._state_classes, args)
+      nested_args = sparse.deserialize_sparse_tensors(
+          nested_args, self._state_types, self._state_shapes,
+          self._state_classes)
+      if _should_unpack_args(nested_args):
+        ret = next_func(*nested_args)
+      else:
+        ret = next_func(nested_args)
+
+      # If `next_func` returns a list of tensors, `nest.flatten()` and
+      # `ops.convert_to_tensor()` would conspire to attempt to stack
+      # those tensors into a single tensor, because the customized
+      # version of `nest.flatten()` does not recurse into lists. Since
+      # it is more likely that the list arose from returning the
+      # result of an operation (such as `tf.py_func()`) that returns a
+      # list of not-necessarily-stackable tensors, we treat the
+      # returned value is a `tuple` instead. A user wishing to pack
+      # the return value into a single tensor can use an explicit
+      # `tf.stack()` before returning.
+      if isinstance(ret, list):
+        ret = tuple(ret)
+
+      # Convert any `SparseTensorValue`s to `SparseTensor`s and all other
+      # values to tensors.
+      ret = nest.pack_sequence_as(ret, [
+          sparse_tensor_lib.SparseTensor.from_value(t)
+          if sparse_tensor_lib.is_sparse(t) else ops.convert_to_tensor(t)
+          for t in nest.flatten(ret)
+      ])
+
+      self._output_classes = sparse.get_classes(ret)
+      self._output_shapes = nest.pack_sequence_as(
+          ret, [t.get_shape() for t in nest.flatten(ret)])
+      self._output_types = nest.pack_sequence_as(
+          ret, [t.dtype for t in nest.flatten(ret)])
+
+      # Serialize any sparse tensors.
+      ret = nest.pack_sequence_as(
+          ret, [t for t in nest.flatten(sparse.serialize_sparse_tensors(ret))])
+      return nest.flatten(ret)
+
+    self._next_func = tf_next_func
+    self._next_func.add_to_graph(ops.get_default_graph())
+
+    @function.Defun(*nest.flatten(
+        sparse.as_dense_types(self._state_types, self._state_classes)))
+    def tf_finalize_func(*args):
+      """A wrapper for Defun that facilitates shape inference."""
+      # Pass in shape information from the state.
+      dense_shapes = sparse.as_dense_shapes(self._state_shapes,
+                                            self._state_classes)
+      for arg, shape in zip(args, nest.flatten(dense_shapes)):
+        arg.set_shape(shape)
+
+      nested_args = nest.pack_sequence_as(self._state_classes, args)
+      nested_args = sparse.deserialize_sparse_tensors(
+          nested_args, self._state_types, self._state_shapes,
+          self._state_classes)
+      if _should_unpack_args(nested_args):
+        return finalize_func(*nested_args)
+      else:
+        return finalize_func(nested_args)
+
+    self._finalize_func = tf_finalize_func
+    self._finalize_func.add_to_graph(ops.get_default_graph())
+
+  def _as_variant_tensor(self):
+    return gen_dataset_ops.generator_dataset(
+        nest.flatten(self._init_args) + self._init_func.captured_inputs,
+        self._next_func.captured_inputs,
+        self._finalize_func.captured_inputs,
+        init_func=self._init_func,
+        next_func=self._next_func,
+        finalize_func=self._finalize_func,
+        output_types=nest.flatten(
+            sparse.as_dense_types(self.output_types, self.output_classes)),
+        output_shapes=nest.flatten(
+            sparse.as_dense_shapes(self.output_shapes, self.output_classes)))
+
+  @property
+  def output_classes(self):
+    return self._output_classes
+
+  @property
+  def output_shapes(self):
+    return self._output_shapes
+
+  @property
+  def output_types(self):
+    return self._output_types
 
 
 class ZipDataset(Dataset):
@@ -1271,16 +1562,7 @@ class ShuffleDataset(Dataset):
     self._input_dataset = input_dataset
     self._buffer_size = ops.convert_to_tensor(
         buffer_size, dtype=dtypes.int64, name="buffer_size")
-    seed, seed2 = random_seed.get_seed(seed)
-    if seed is None:
-      self._seed = constant_op.constant(0, dtype=dtypes.int64, name="seed")
-    else:
-      self._seed = ops.convert_to_tensor(seed, dtype=dtypes.int64, name="seed")
-    if seed2 is None:
-      self._seed2 = constant_op.constant(0, dtype=dtypes.int64, name="seed2")
-    else:
-      self._seed2 = ops.convert_to_tensor(
-          seed2, dtype=dtypes.int64, name="seed2")
+    self._seed, self._seed2 = random_seed.get_seed(seed)
     if reshuffle_each_iteration is None:
       self._reshuffle_each_iteration = True
     else:
@@ -1448,6 +1730,19 @@ def _padding_value_to_tensor(value, output_type):
   return value
 
 
+def _default_padding(input_dataset):
+
+  def make_zero(t):
+    if t.base_dtype == dtypes.string:
+      return ""
+    elif t.base_dtype == dtypes.variant:
+      raise TypeError("Unable to create padding for field of type 'variant'")
+    else:
+      return np.zeros_like(t.as_numpy_dtype())
+
+  return nest.map_structure(make_zero, input_dataset.output_types)
+
+
 class PaddedBatchDataset(Dataset):
   """A `Dataset` that batches and pads contiguous elements from its input."""
 
@@ -1463,22 +1758,12 @@ class PaddedBatchDataset(Dataset):
         batch_size, dtype=dtypes.int64, name="batch_size")
     padding_values = (
         padding_values
-        if padding_values is not None else self._default_padding(input_dataset))
+        if padding_values is not None else _default_padding(input_dataset))
     self._padded_shapes = nest.map_structure_up_to(
         input_dataset.output_shapes, _partial_shape_to_tensor, padded_shapes)
     self._padding_values = nest.map_structure_up_to(
         input_dataset.output_shapes, _padding_value_to_tensor, padding_values,
         input_dataset.output_types)
-
-  def _default_padding(self, input_dataset):
-
-    def make_zero(t):
-      if t.base_dtype == dtypes.string:
-        return ""
-      else:
-        return np.zeros_like(t.as_numpy_dtype())
-
-    return nest.map_structure(make_zero, input_dataset.output_types)
 
   def _as_variant_tensor(self):
     return gen_dataset_ops.padded_batch_dataset(
@@ -1560,10 +1845,12 @@ class MapDataset(Dataset):
       if isinstance(ret, list):
         ret = tuple(ret)
 
-      # Convert any `SparseTensorValue`s to `SparseTensor`s.
+      # Convert any `SparseTensorValue`s to `SparseTensor`s and all other
+      # values to tensors.
       ret = nest.pack_sequence_as(ret, [
           sparse_tensor_lib.SparseTensor.from_value(t)
-          if sparse_tensor_lib.is_sparse(t) else t for t in nest.flatten(ret)
+          if sparse_tensor_lib.is_sparse(t) else ops.convert_to_tensor(t)
+          for t in nest.flatten(ret)
       ])
 
       self._output_classes = sparse.get_classes(ret)
@@ -1572,11 +1859,9 @@ class MapDataset(Dataset):
       self._output_types = nest.pack_sequence_as(
           ret, [t.dtype for t in nest.flatten(ret)])
 
-      # Serialize any sparse tensors and convert result to tensors.
-      ret = nest.pack_sequence_as(ret, [
-          ops.convert_to_tensor(t)
-          for t in nest.flatten(sparse.serialize_sparse_tensors(ret))
-      ])
+      # Serialize any sparse tensors.
+      ret = nest.pack_sequence_as(
+          ret, [t for t in nest.flatten(sparse.serialize_sparse_tensors(ret))])
       return nest.flatten(ret)
 
     self._map_func = tf_map_func
@@ -1694,47 +1979,13 @@ class FlatMapDataset(Dataset):
     return self._output_types
 
 
-class InterleaveDataset(Dataset):
+class InterleaveDataset(FlatMapDataset):
   """A `Dataset` that maps a function over its input and interleaves the result.
   """
 
   def __init__(self, input_dataset, map_func, cycle_length, block_length):
     """See `Dataset.interleave()` for details."""
-    super(InterleaveDataset, self).__init__()
-    self._input_dataset = input_dataset
-
-    @function.Defun(*nest.flatten(
-        sparse.as_dense_types(input_dataset.output_types,
-                              input_dataset.output_classes)))
-    def tf_map_func(*args):
-      """A wrapper for Defun that facilitates shape inference."""
-      # Pass in shape information from the input_dataset.
-      dense_shapes = sparse.as_dense_shapes(input_dataset.output_shapes,
-                                            input_dataset.output_classes)
-      for arg, shape in zip(args, nest.flatten(dense_shapes)):
-        arg.set_shape(shape)
-
-      nested_args = nest.pack_sequence_as(input_dataset.output_types, args)
-      nested_args = sparse.deserialize_sparse_tensors(
-          nested_args, input_dataset.output_types, input_dataset.output_shapes,
-          input_dataset.output_classes)
-      if _should_unpack_args(nested_args):
-        dataset = map_func(*nested_args)
-      else:
-        dataset = map_func(nested_args)
-
-      if not isinstance(dataset, Dataset):
-        raise TypeError("`map_func` must return a `Dataset` object.")
-
-      self._output_classes = dataset.output_classes
-      self._output_types = dataset.output_types
-      self._output_shapes = dataset.output_shapes
-
-      return dataset._as_variant_tensor()  # pylint: disable=protected-access
-
-    self._map_func = tf_map_func
-    self._map_func.add_to_graph(ops.get_default_graph())
-
+    super(InterleaveDataset, self).__init__(input_dataset, map_func)
     self._cycle_length = ops.convert_to_tensor(
         cycle_length, dtype=dtypes.int64, name="cycle_length")
     self._block_length = ops.convert_to_tensor(
@@ -1743,26 +1994,14 @@ class InterleaveDataset(Dataset):
   def _as_variant_tensor(self):
     return gen_dataset_ops.interleave_dataset(
         self._input_dataset._as_variant_tensor(),  # pylint: disable=protected-access
-        self._map_func.captured_inputs,
+        self._map_func.captured_inputs,  # pylint: disable=protected-access
         self._cycle_length,
         self._block_length,
-        f=self._map_func,
+        f=self._map_func,  # pylint: disable=protected-access
         output_types=nest.flatten(
             sparse.as_dense_types(self.output_types, self.output_classes)),
         output_shapes=nest.flatten(
             sparse.as_dense_shapes(self.output_shapes, self.output_classes)))
-
-  @property
-  def output_classes(self):
-    return self._output_classes
-
-  @property
-  def output_shapes(self):
-    return self._output_shapes
-
-  @property
-  def output_types(self):
-    return self._output_types
 
 
 class FilterDataset(Dataset):
@@ -1833,6 +2072,8 @@ class PrefetchDataset(Dataset):
     """See `Dataset.prefetch()` for details."""
     super(PrefetchDataset, self).__init__()
     self._input_dataset = input_dataset
+    if buffer_size is None:
+      buffer_size = -1  # This is the sentinel for auto-tuning.
     self._buffer_size = ops.convert_to_tensor(
         buffer_size, dtype=dtypes.int64, name="buffer_size")
 

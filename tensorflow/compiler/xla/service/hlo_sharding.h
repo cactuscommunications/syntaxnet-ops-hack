@@ -94,7 +94,14 @@ class HloSharding {
   // Create a new sharding from a protobuf OpSharding.
   static StatusOr<HloSharding> FromProto(const OpSharding& proto);
 
+  // Checks whether device is a reserved device number. A reserved device number
+  // has usually a special meaning, with dedicated handling logic.
+  static bool IsReservedDevice(int64 device) { return device < 0; }
+
   OpSharding ToProto() const;
+
+  // Note that this string canonically has outer curly braces, e.g.
+  // "{replicated}".
   string ToString() const;
 
   // Validate that this sharding can be applied to a tensor with shape `shape`.
@@ -156,24 +163,18 @@ class HloSharding {
   // tuple, if IsTuple, or a ShapeTree with a single element containing this
   // sharding. Only the leaf elements are populated. This creates a new
   // ShapeTree object so is not cheap.
+  StatusOr<ShapeTree<HloSharding>> AsShapeTree(const Shape& shape) const;
   ShapeTree<HloSharding> GetAsShapeTree(const Shape& shape) const {
-    if (IsTuple()) {
-      ShapeTree<HloSharding> result(shape, HloSharding::Replicate());
-      CHECK_EQ(std::distance(result.leaf_begin(), result.leaf_end()),
-               tuple_elements_.size());
-      auto it = tuple_elements_.begin();
-      for (auto& index_to_sharding : result.leaves()) {
-        index_to_sharding.second = *it++;
-      }
-      return result;
-    } else {
-      return ShapeTree<HloSharding>(shape, *this);
-    }
+    return AsShapeTree(shape).ValueOrDie();
   }
+
+  // Retrieves the sub sharding at a given index, out of a tuple sharding.
+  // REQUIRES: IsTuple()
+  HloSharding GetSubSharding(const Shape& shape, const ShapeIndex& index) const;
 
   bool operator==(const HloSharding& other) const {
     return replicated_ == other.replicated_ && maximal_ == other.maximal_ &&
-           protobuf_util::ProtobufEquals(tile_shape_, other.tile_shape_) &&
+           ShapeUtil::Compatible(tile_shape_, other.tile_shape_) &&
            tile_assignment_ == other.tile_assignment_ &&
            tuple_elements_ == other.tuple_elements_;
   }
@@ -200,12 +201,38 @@ class HloSharding {
     return h;
   }
 
+  struct Hasher {
+    size_t operator()(const HloSharding& sharding) const {
+      return sharding.Hash();
+    }
+  };
+
   // Gets the tile shape.
   // REQUIRES: !IsTileMaximal() && !IsTuple()
   const Shape& tile_shape() const { return tile_shape_; }
   // Gets the tile assignment tensor.
   // REQUIRES: !IsReplicated() && !IsTuple()
   const Array<int64>& tile_assignment() const { return tile_assignment_; }
+
+  // Returns the flattened list of all the leaf shardings in a tuple shape, by
+  // pre-order walk (ShapeTree iterator order).
+  // REQUIRES: IsTuple().
+  const std::vector<HloSharding>& tuple_elements() const {
+    return tuple_elements_;
+  }
+
+  // Return a new sharding that can apply to the given new shape.
+  // If this sharding is tile-maximal, the returned sharding will be the same as
+  // this sharding. If this sharding is not tile-maximal, the returned
+  // sharding's tile size will differ:
+  //   - Non-sharded dimensions will be adapted to be the same as `new_shape`;
+  //     tile_dimension(i) = new_shape.dimensions(i);
+  //   - Sharded dimensions will be kept the same unless `transform` is supplied
+  //     in which case tile_dimension(i) = transform(i, tile_dimension(i));
+  // REQUIRES: !IsTuple().
+  HloSharding TransformShardedTileShape(
+      const Shape& new_shape,
+      const std::function<int64(int64, int64)>& transform = nullptr) const;
 
  private:
   HloSharding()
@@ -248,6 +275,8 @@ class HloSharding {
   // shardings in a tuple shape, by pre-order walk (ShapeTree iterator order).
   std::vector<HloSharding> tuple_elements_;
 };
+
+std::ostream& operator<<(std::ostream& out, const HloSharding& sharding);
 
 }  // namespace xla
 

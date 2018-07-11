@@ -64,7 +64,7 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
 
     ~FileDataset() override { input_->Unref(); }
 
-    std::unique_ptr<IteratorBase> MakeIterator(
+    std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
       if (env_->FileExists(strings::StrCat(filename_, ".index")).ok()) {
         return std::unique_ptr<IteratorBase>(new FileReaderIterator(
@@ -83,7 +83,9 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
       return input_->output_shapes();
     }
 
-    string DebugString() override { return "CacheDatasetOp::FileDataset"; }
+    string DebugString() const override {
+      return "CacheDatasetOp::FileDataset";
+    }
 
    private:
     static size_t StringPaddingSize(size_t num_tensors) {
@@ -106,11 +108,14 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
       explicit FileWriterIterator(const Params& params)
           : DatasetIterator<FileDataset>(params),
             cur_index_(0),
-            input_impl_(params.dataset->input_->MakeIterator(params.prefix)),
             writer_(params.dataset->env_, params.dataset->filename_),
             lockfile_(strings::StrCat(params.dataset->filename_, ".lockfile")),
             lockfile_created_(false),
             iteration_completed_(false) {}
+
+      Status Initialize(IteratorContext* ctx) override {
+        return dataset()->input_->MakeIterator(ctx, prefix(), &input_impl_);
+      }
 
       Status GetNextInternal(IteratorContext* ctx,
                              std::vector<Tensor>* out_tensors,
@@ -268,7 +273,7 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
 
     ~MemoryDataset() override { input_->Unref(); }
 
-    std::unique_ptr<IteratorBase> MakeIterator(
+    std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
       mutex_lock l(mu_);
       if (cache_) {
@@ -292,7 +297,9 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
       return input_->output_shapes();
     }
 
-    string DebugString() override { return "CacheDatasetOp::MemoryDataset"; }
+    string DebugString() const override {
+      return "CacheDatasetOp::MemoryDataset";
+    }
 
    private:
     // MemoryWriterIterator passes through and appends items from the input
@@ -305,8 +312,26 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
      public:
       explicit MemoryWriterIterator(const Params& params)
           : DatasetIterator<MemoryDataset>(params),
-            input_impl_(params.dataset->input_->MakeIterator(params.prefix)),
             cache_(new std::vector<std::vector<Tensor>>) {}
+
+      ~MemoryWriterIterator() override {
+        mutex_lock l(mu_);
+        if (cache_) {
+          LOG(ERROR)
+              << "The calling iterator did not fully read the dataset we were "
+                 "attempting to cache. In order to avoid unexpected truncation "
+                 "of the sequence, the current [partially cached] sequence "
+                 "will be dropped. This can occur if you have a sequence "
+                 "similar to `dataset.cache().take(k).repeat()`. Instead, swap "
+                 "the order (i.e. `dataset.take(k).cache().repeat()`)";
+          mutex_lock l2(dataset()->mu_);
+          dataset()->writer_iterator_created_ = false;
+        }
+      }
+
+      Status Initialize(IteratorContext* ctx) override {
+        return dataset()->input_->MakeIterator(ctx, prefix(), &input_impl_);
+      }
 
       Status GetNextInternal(IteratorContext* ctx,
                              std::vector<Tensor>* out_tensors,
@@ -318,7 +343,7 @@ class CacheDatasetOp : public UnaryDatasetOpKernel {
           // Guard on cache_ to not crash if GetNext is called a second time
           // after *end_of_sequence == true
           if (cache_) {
-            mutex_lock l2(dataset()->mu_);
+            mutex_lock l(dataset()->mu_);
             DCHECK(dataset()->writer_iterator_created_);
             DCHECK(!dataset()->cache_);
             cache_.swap(dataset()->cache_);

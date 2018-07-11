@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef THIRD_PARTY_TENSORFLOW_COMPILER_XLA_SERVICE_CPU_KERNEL_SUPPORT_LIBRARY_H_
-#define THIRD_PARTY_TENSORFLOW_COMPILER_XLA_SERVICE_CPU_KERNEL_SUPPORT_LIBRARY_H_
+#ifndef TENSORFLOW_COMPILER_XLA_SERVICE_CPU_KERNEL_SUPPORT_LIBRARY_H_
+#define TENSORFLOW_COMPILER_XLA_SERVICE_CPU_KERNEL_SUPPORT_LIBRARY_H_
 
 #include <string>
 
@@ -101,6 +101,15 @@ class KernelSupportLibrary {
   }
 
   void For(
+      tensorflow::StringPiece name, llvm::Value* start, llvm::Value* end,
+      int64 step,
+      const std::function<void(llvm::Value* ind_var)>& for_body_generator) {
+    For(name, start, end, ir_builder_->getInt64(step),
+        /*peel_first_iteration=*/false,
+        [&](llvm::Value* indvar, llvm::Value*) { for_body_generator(indvar); });
+  }
+
+  void For(
       tensorflow::StringPiece name, int64 start, int64 end, int64 step,
       const std::function<void(llvm::Value* ind_var)>& for_body_generator) {
     For(name, /*start=*/ir_builder_->getInt64(start),
@@ -179,4 +188,4 @@ class KernelSupportLibrary {
 };
 }  // namespace xla
 
-#endif  // THIRD_PARTY_TENSORFLOW_COMPILER_XLA_SERVICE_CPU_KERNEL_SUPPORT_LIBRARY_H_
+#endif  // TENSORFLOW_COMPILER_XLA_SERVICE_CPU_KERNEL_SUPPORT_LIBRARY_H_

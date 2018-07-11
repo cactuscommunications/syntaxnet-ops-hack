@@ -16,17 +16,6 @@
 """Operations for working with string Tensors.
 
 See the @{$python/string_ops} guide.
-
-@@string_to_hash_bucket_fast
-@@string_to_hash_bucket_strong
-@@string_to_hash_bucket
-@@reduce_join
-@@string_join
-@@string_split
-@@substr
-@@as_string
-@@encode_base64
-@@decode_base64
 """
 
 from __future__ import absolute_import
@@ -47,9 +36,13 @@ from tensorflow.python.ops import math_ops
 # pylint: disable=wildcard-import
 from tensorflow.python.ops.gen_string_ops import *
 from tensorflow.python.util import deprecation
+from tensorflow.python.util.tf_export import tf_export
 # pylint: enable=wildcard-import
 
+# Expose regex_full_match in strings namespace
+tf_export("strings.regex_full_match")(regex_full_match)
 
+@tf_export("string_split")
 def string_split(source, delimiter=" ", skip_empty=True):  # pylint: disable=invalid-name
   """Split elements of `source` based on `delimiter` into a `SparseTensor`.
 
@@ -91,10 +84,8 @@ def string_split(source, delimiter=" ", skip_empty=True):  # pylint: disable=inv
   delimiter = ops.convert_to_tensor(delimiter, dtype=dtypes.string)
   source = ops.convert_to_tensor(source, dtype=dtypes.string)
 
-  # pylint: disable=protected-access
-  indices, values, shape = gen_string_ops._string_split(
+  indices, values, shape = gen_string_ops.string_split(
       source, delimiter=delimiter, skip_empty=skip_empty)
-  # pylint: enable=protected-access
   indices.set_shape([None, 2])
   values.set_shape([None])
   shape.set_shape([2])
@@ -112,7 +103,7 @@ def _reduce_join_reduction_dims(x, axis, reduction_indices):
     return axis
   else:
     # Fast path: avoid creating Rank and Range ops if ndims is known.
-    if isinstance(x, ops.Tensor) and x.get_shape().ndims is not None:
+    if x.get_shape().ndims is not None:
       return constant_op.constant(
           np.arange(x.get_shape().ndims - 1, -1, -1), dtype=dtypes.int32)
 
@@ -120,15 +111,17 @@ def _reduce_join_reduction_dims(x, axis, reduction_indices):
     return math_ops.range(array_ops.rank(x) - 1, -1, -1)
 
 
+@tf_export("reduce_join")
 def reduce_join(inputs, axis=None,
                 keep_dims=False,
                 separator="",
                 name=None,
                 reduction_indices=None):
+  inputs_t = ops.convert_to_tensor(inputs)
   reduction_indices = _reduce_join_reduction_dims(
-      inputs, axis, reduction_indices)
+      inputs_t, axis, reduction_indices)
   return gen_string_ops.reduce_join(
-      inputs=inputs,
+      inputs=inputs_t,
       reduction_indices=reduction_indices,
       keep_dims=keep_dims,
       separator=separator,
@@ -138,6 +131,7 @@ def reduce_join(inputs, axis=None,
 reduce_join.__doc__ = deprecation.rewrite_argument_docstring(
     gen_string_ops.reduce_join.__doc__, "reduction_indices", "axis")
 
+ops.NotDifferentiable("RegexReplace")
 ops.NotDifferentiable("StringToHashBucket")
 ops.NotDifferentiable("StringToHashBucketFast")
 ops.NotDifferentiable("StringToHashBucketStrong")

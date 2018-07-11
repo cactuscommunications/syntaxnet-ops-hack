@@ -67,9 +67,8 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
         errors::InvalidArgument("block_length must be greater than zero."));
 
     std::unique_ptr<CapturedFunction> captured_func;
-    OP_REQUIRES_OK(ctx, CapturedFunction::Create(ctx, func_, graph_def_version_,
-                                                 std::move(other_arguments),
-                                                 &captured_func));
+    OP_REQUIRES_OK(ctx, CapturedFunction::Create(
+                            func_, std::move(other_arguments), &captured_func));
 
     *output =
         new Dataset(ctx, input, func_, std::move(captured_func), cycle_length,
@@ -97,7 +96,7 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
 
     ~Dataset() override { input_->Unref(); }
 
-    std::unique_ptr<IteratorBase> MakeIterator(
+    std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
       return std::unique_ptr<IteratorBase>(
           new Iterator({this, strings::StrCat(prefix, "::Interleave")}));
@@ -110,7 +109,9 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
       return output_shapes_;
     }
 
-    string DebugString() override { return "InterleaveDatasetOp::Dataset"; }
+    string DebugString() const override {
+      return "InterleaveDatasetOp::Dataset";
+    }
 
    protected:
     Status AsGraphDefInternal(OpKernelContext* ctx, DatasetGraphDefBuilder* b,
@@ -150,9 +151,12 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
      public:
       explicit Iterator(const Params& params)
           : DatasetIterator<Dataset>(params),
-            input_impl_(params.dataset->input_->MakeIterator(params.prefix)),
             current_elements_(params.dataset->cycle_length_),
             args_list_(params.dataset->cycle_length_) {}
+
+      Status Initialize(IteratorContext* ctx) override {
+        return dataset()->input_->MakeIterator(ctx, prefix(), &input_impl_);
+      }
 
       void AdvanceToNextInCycle() EXCLUSIVE_LOCKS_REQUIRED(mu_) {
         block_index_ = 0;
@@ -228,7 +232,7 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
         return Status::OK();
       }
 
-      Status RestoreInternal(OpKernelContext* ctx,
+      Status RestoreInternal(IteratorContext* ctx,
                              IteratorStateReader* reader) override {
         mutex_lock l(mu_);
         TF_RETURN_IF_ERROR(RestoreParent(ctx, reader, input_impl_));
@@ -266,13 +270,9 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
         return Status::OK();
       }
 
-      Status RestoreCurrentElements(OpKernelContext* ctx,
+      Status RestoreCurrentElements(IteratorContext* ctx,
                                     IteratorStateReader* reader)
           EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-        IteratorContext::Params params;
-        params.env = ctx->env();
-        params.runner = *(ctx->runner());
-        IteratorContext iter_ctx(std::move(params));
         for (int idx = 0; idx < current_elements_.size(); idx++) {
           if (reader->Contains(
                   full_name(strings::StrCat("args_size[", idx, "]")))) {
@@ -287,9 +287,8 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
                   &args_list_[idx][i]));
             }
             TF_RETURN_IF_ERROR(dataset::MakeIteratorFromInputElement(
-                &iter_ctx, args_list_[idx], idx,
-                dataset()->captured_func_.get(), prefix(),
-                &current_elements_[idx]));
+                ctx, args_list_[idx], idx, dataset()->captured_func_.get(),
+                prefix(), &current_elements_[idx]));
             TF_RETURN_IF_ERROR(
                 RestoreParent(ctx, reader, current_elements_[idx]));
           } else {
@@ -300,7 +299,7 @@ class InterleaveDatasetOp : public UnaryDatasetOpKernel {
       }
 
       mutex mu_;
-      const std::unique_ptr<IteratorBase> input_impl_ GUARDED_BY(mu_);
+      std::unique_ptr<IteratorBase> input_impl_ GUARDED_BY(mu_);
       std::vector<std::unique_ptr<IteratorBase>> current_elements_
           GUARDED_BY(mu_);
       std::vector<std::vector<Tensor>> args_list_ GUARDED_BY(mu_);

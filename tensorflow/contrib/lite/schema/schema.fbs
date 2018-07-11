@@ -33,6 +33,7 @@ enum TensorType : byte {
   UINT8 = 3,
   INT64 = 4,
   STRING = 5,
+  BOOL = 6,
 }
 
 // Parameters for converting a quantized tensor back to float. Given a
@@ -53,18 +54,18 @@ table Tensor {
   type:TensorType;
   // An index that refers to the buffers table at the root of the model. Or,
   // if there is no data buffer associated (i.e. intermediate results), then
-  // this is 0 (which refers to an always existant empty buffer).
+  // this is 0 (which refers to an always existent empty buffer).
   //
   // The data_buffer itself is an opaque container, with the assumption that the
   // target device is little-endian. In addition, all builtin operators assume
   // the memory is ordered such that if `shape` is [4, 3, 2], then index
-  // [i, j, k] maps to data_buffer[i*3*2 + j*3 + k].
+  // [i, j, k] maps to data_buffer[i*3*2 + j*2 + k].
   buffer:uint;
   name:string;  // For debugging and importing back into tensorflow.
   quantization:QuantizationParameters;  // Optional.
 }
 
-// A list of builtin operators. Builtin operators a slighlty faster than custom
+// A list of builtin operators. Builtin operators are slightly faster than custom
 // ones, but not by much. Moreover, while custom operators accept an opaque
 // object containing configuration parameters, builtins have a predetermined
 // set of acceptable options.
@@ -75,9 +76,9 @@ enum BuiltinOperator : byte {
   CONV_2D = 3,
   DEPTHWISE_CONV_2D = 4,
   // DEPTH_TO_SPACE = 5,
-  // DEQUANTIZE = 6,
+  DEQUANTIZE = 6,
   EMBEDDING_LOOKUP = 7,
-  // FLOOR = 8,
+  FLOOR = 8,
   FULLY_CONNECTED = 9,
   HASHTABLE_LOOKUP = 10,
   L2_NORMALIZATION = 11,
@@ -89,7 +90,10 @@ enum BuiltinOperator : byte {
   MAX_POOL_2D = 17,
   MUL = 18,
   RELU = 19,
-  RELU1 = 20,
+  // NOTE(aselle): RELU_N1_TO_1 used to be called RELU1, but it was renamed
+  // since different model developers use RELU1 in different ways. Never
+  // create another op called RELU1.
+  RELU_N1_TO_1 = 20,
   RELU6 = 21,
   RESHAPE = 22,
   RESIZE_BILINEAR = 23,
@@ -110,6 +114,38 @@ enum BuiltinOperator : byte {
   BATCH_TO_SPACE_ND = 37,
   SPACE_TO_BATCH_ND = 38,
   TRANSPOSE = 39,
+  MEAN = 40,
+  SUB = 41,
+  DIV = 42,
+  SQUEEZE = 43,
+  UNIDIRECTIONAL_SEQUENCE_LSTM = 44,
+  STRIDED_SLICE = 45,
+  BIDIRECTIONAL_SEQUENCE_RNN = 46,
+  EXP = 47,
+  TOPK_V2 = 48,
+  SPLIT = 49,
+  LOG_SOFTMAX = 50,
+  // DELEGATE is a special op type for the operations which are delegated to
+  // other backends.
+  // WARNING: Experimental interface, subject to change
+  DELEGATE = 51,
+  BIDIRECTIONAL_SEQUENCE_LSTM = 52,
+  CAST = 53,
+  PRELU = 54,
+  MAXIMUM = 55,
+  ARG_MAX = 56,
+  MINIMUM = 57,
+  LESS = 58,
+  NEG = 59,
+  PADV2 = 60,
+  GREATER = 61,
+  GREATER_EQUAL = 62,
+  LESS_EQUAL = 63,
+  SELECT = 64,
+  SLICE = 65,
+  SIN = 66,
+  TRANSPOSE_CONV = 67,
+  SPARSE_TO_DENSE = 68,
 }
 
 // Options for the builtin operators.
@@ -140,6 +176,30 @@ union BuiltinOptions {
   BatchToSpaceNDOptions,
   SpaceToBatchNDOptions,
   TransposeOptions,
+  MeanOptions,
+  SubOptions,
+  DivOptions,
+  SqueezeOptions,
+  SequenceRNNOptions,
+  StridedSliceOptions,
+  ExpOptions,
+  TopKV2Options,
+  SplitOptions,
+  LogSoftmaxOptions,
+  CastOptions,
+  DequantizeOptions,
+  MaximumMinimumOptions,
+  ArgMaxOptions,
+  LessOptions,
+  NegOptions,
+  PadV2Options,
+  GreaterOptions,
+  GreaterEqualOptions,
+  LessEqualOptions,
+  SelectOptions,
+  SliceOptions,
+  TransposeConvOptions,
+  SparseToDenseOptions,
 }
 
 enum Padding : byte { SAME, VALID }
@@ -147,7 +207,7 @@ enum Padding : byte { SAME, VALID }
 enum ActivationFunctionType : byte {
   NONE = 0,
   RELU = 1,
-  RELU1 = 2,
+  RELU_N1_TO_1 = 2,
   RELU6 = 3,
   TANH = 4,
   SIGN_BIT = 5,
@@ -158,6 +218,8 @@ table Conv2DOptions {
   stride_w:int;
   stride_h:int;
   fused_activation_function:ActivationFunctionType;
+  dilation_w_factor:int = 1;
+  dilation_h_factor:int = 1;
 }
 
 table Pool2DOptions {
@@ -203,6 +265,18 @@ table RNNOptions {
   fused_activation_function:ActivationFunctionType;
 }
 
+// An implementation of TensorFlow dynamic_rnn with RNNCell.
+table SequenceRNNOptions {
+  time_major:bool;
+  fused_activation_function:ActivationFunctionType;
+}
+
+// An implementation of TensorFlow bidrectional_dynamic_rnn with RNNCell.
+table BidirectionalSequenceRNNOptions {
+  time_major:bool;
+  fused_activation_function:ActivationFunctionType;
+}
+
 // An implementation of TensorFlow fully_connected (a.k.a Dense) layer.
 table FullyConnectedOptions {
   fused_activation_function:ActivationFunctionType;
@@ -245,8 +319,9 @@ table LSTMOptions {
 }
 
 table ResizeBilinearOptions {
-  new_height:int;
-  new_width:int;
+  new_height: int (deprecated);
+  new_width: int (deprecated);
+  align_corners: bool;
 }
 
 // A call operation options
@@ -256,8 +331,9 @@ table CallOptions {
 }
 
 table PadOptions {
-  before_padding:[int];
-  after_padding:[int];
+}
+
+table PadV2Options {
 }
 
 table ReshapeOptions {
@@ -265,15 +341,9 @@ table ReshapeOptions {
 }
 
 table SpaceToBatchNDOptions {
-  block_shape:[int];
-  before_paddings:[int];
-  after_paddings:[int];
 }
 
 table BatchToSpaceNDOptions {
-  block_shape:[int];
-  before_crops:[int];
-  after_crops:[int];
 }
 
 table SkipGramOptions {
@@ -284,6 +354,17 @@ table SkipGramOptions {
 
 table SpaceToDepthOptions {
   block_size: int;
+}
+
+table SubOptions {
+  fused_activation_function:ActivationFunctionType;
+}
+
+table DivOptions {
+  fused_activation_function:ActivationFunctionType;
+}
+
+table TopKV2Options {
 }
 
 enum CombinerType : byte {
@@ -301,7 +382,78 @@ table GatherOptions {
 }
 
 table TransposeOptions {
-  perm:[int];
+}
+
+table ExpOptions {
+}
+
+table MeanOptions {
+  keep_dims: bool;
+}
+
+table SqueezeOptions {
+  squeeze_dims:[int];
+}
+
+table SplitOptions {
+  num_splits: int;
+}
+
+table StridedSliceOptions {
+  begin_mask: int;
+  end_mask: int;
+  ellipsis_mask: int;
+  new_axis_mask: int;
+  shrink_axis_mask: int;
+}
+
+table LogSoftmaxOptions {
+}
+
+table CastOptions {
+  in_data_type: TensorType;
+  out_data_type: TensorType;
+}
+
+table DequantizeOptions {
+}
+
+table MaximumMinimumOptions {
+}
+
+table ArgMaxOptions {
+  output_type : TensorType;
+}
+
+table GreaterOptions {
+}
+
+table GreaterEqualOptions {
+}
+
+table LessOptions {
+}
+
+table LessEqualOptions {
+}
+
+table NegOptions {
+}
+
+table SelectOptions {
+}
+
+table SliceOptions {
+}
+
+table TransposeConvOptions {
+  padding:Padding;
+  stride_w:int;
+  stride_h:int;
+}
+
+table SparseToDenseOptions {
+  validate_indices:bool;
 }
 
 // An OperatorCode can be an enum value (BuiltinOperator) if the operator is a
@@ -309,6 +461,10 @@ table TransposeOptions {
 table OperatorCode {
   builtin_code:BuiltinOperator;
   custom_code:string;
+
+  // The version of the operator. The version need to be bumped whenever new
+  // parameters are introduced into an op.
+  version:int = 1;
 }
 
 enum CustomOptionsFormat : byte {
@@ -333,21 +489,25 @@ table Operator {
   custom_options_format:CustomOptionsFormat;
 }
 
-// The root type, defining a model.
+// The root type, defining a subgraph, which typically represents an entire
+// model.
 table SubGraph {
-  // A list of all tensors used in this model.
+  // A list of all tensors used in this subgraph.
   tensors:[Tensor];
 
-  // Indices of the input tensors.
+  // Indices of the tensors that are inputs into this subgraph. Note this is
+  // the list of non-static tensors that feed into the subgraph for inference.
   inputs:[int];
 
-  // Indices of the output tensors.
+  // Indices of the tensors that are outputs out of this subgraph. Note this is
+  // the list of output tensors that are considered the product of the
+  // subgraph's inference.
   outputs:[int];
 
   // All operators, in execution order.
   operators:[Operator];
 
-  // Name of subgraph (used for debugging).
+  // Name of this subgraph (used for debugging).
   name:string;
 }
 
@@ -373,9 +533,14 @@ table Model {
   // A description of the model.
   description:string;
 
-  // Buffers of the model
+  // Buffers of the model.
+  // Note the 0th entry of this array must be an empty buffer (sentinel).
+  // This is a convention so that tensors without a buffer can provide 0 as
+  // their buffer.
   buffers:[Buffer];
 
+  // Metadata about the model.  Indirects into the existings buffers list.
+  metadata_buffer:[int];
 }
 
 root_type Model;

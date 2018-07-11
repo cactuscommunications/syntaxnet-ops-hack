@@ -48,9 +48,8 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
     }
 
     std::unique_ptr<CapturedFunction> captured_func;
-    OP_REQUIRES_OK(ctx, CapturedFunction::Create(ctx, func_, graph_def_version_,
-                                                 std::move(other_arguments),
-                                                 &captured_func));
+    OP_REQUIRES_OK(ctx, CapturedFunction::Create(
+                            func_, std::move(other_arguments), &captured_func));
 
     *output = new Dataset(ctx, input, func_, std::move(captured_func),
                           output_types_, output_shapes_);
@@ -75,7 +74,7 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
 
     ~Dataset() override { input_->Unref(); }
 
-    std::unique_ptr<IteratorBase> MakeIterator(
+    std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
       return std::unique_ptr<IteratorBase>(
           new Iterator({this, strings::StrCat(prefix, "::FlatMap")}));
@@ -89,7 +88,7 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
       return output_shapes_;
     }
 
-    string DebugString() override { return "FlatMapDatasetOp::Dataset"; }
+    string DebugString() const override { return "FlatMapDatasetOp::Dataset"; }
 
    protected:
     Status AsGraphDefInternal(OpKernelContext* ctx, DatasetGraphDefBuilder* b,
@@ -126,8 +125,11 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
     class Iterator : public DatasetIterator<Dataset> {
      public:
       explicit Iterator(const Params& params)
-          : DatasetIterator<Dataset>(params),
-            input_impl_(params.dataset->input_->MakeIterator(params.prefix)) {}
+          : DatasetIterator<Dataset>(params) {}
+
+      Status Initialize(IteratorContext* ctx) override {
+        return dataset()->input_->MakeIterator(ctx, prefix(), &input_impl_);
+      }
 
       Status GetNextInternal(IteratorContext* ctx,
                              std::vector<Tensor>* out_tensors,
@@ -195,7 +197,7 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
         return Status::OK();
       }
 
-      Status RestoreInternal(OpKernelContext* ctx,
+      Status RestoreInternal(IteratorContext* ctx,
                              IteratorStateReader* reader) override {
         mutex_lock l(mu_);
         input_impl_.reset();
@@ -203,7 +205,8 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
         current_element_iterator_.reset();
         captured_func_inputs_.clear();
         if (!reader->Contains(full_name("exhausted"))) {
-          input_impl_ = dataset()->input_->MakeIterator(prefix());
+          TF_RETURN_IF_ERROR(
+              dataset()->input_->MakeIterator(ctx, prefix(), &input_impl_));
           TF_RETURN_IF_ERROR(RestoreParent(ctx, reader, input_impl_));
           {
             int64 temp;
@@ -250,6 +253,7 @@ class FlatMapDatasetOp : public UnaryDatasetOpKernel {
         IteratorContext::Params params;
         params.env = ctx->env();
         params.runner = *(ctx->runner());
+        params.lib = ctx->function_library();
         IteratorContext iter_ctx(std::move(params));
         return BuildCurrentElementIteratorLocked(&iter_ctx);
       }

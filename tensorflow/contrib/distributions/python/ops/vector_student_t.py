@@ -66,7 +66,7 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
   This distribution is an Affine transformation of iid
   [Student's t-distributions](
   https://en.wikipedia.org/wiki/Student%27s_t-distribution)
-  and should not be confused with the [Multivate Student's t-distribution](
+  and should not be confused with the [Multivariate Student's t-distribution](
   https://en.wikipedia.org/wiki/Multivariate_t-distribution). The
   traditional Multivariate Student's t-distribution is type of
   [elliptical distribution](
@@ -175,10 +175,10 @@ class _VectorStudentT(transformed_distribution.TransformedDistribution):
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    parameters = locals()
+    parameters = dict(locals())
     graph_parents = [df, loc, scale_identity_multiplier, scale_diag,
                      scale_tril, scale_perturb_factor, scale_perturb_diag]
-    with ops.name_scope(name):
+    with ops.name_scope(name) as name:
       with ops.name_scope("init", values=graph_parents):
         # The shape of the _VectorStudentT distribution is governed by the
         # relationship between df.batch_shape and affine.batch_shape. In

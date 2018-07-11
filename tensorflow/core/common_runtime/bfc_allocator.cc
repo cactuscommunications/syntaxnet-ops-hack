@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <atomic>
+
 #include "tensorflow/core/common_runtime/bfc_allocator.h"
 
 #include "tensorflow/core/common_runtime/allocator_retry.h"
@@ -84,7 +86,7 @@ BFCAllocator::Chunk* BFCAllocator::ChunkFromHandle(ChunkHandle h) {
   return &(chunks_[h]);
 }
 
-bool BFCAllocator::Extend(size_t rounded_bytes) {
+bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
   size_t available_bytes = memory_limit_ - total_region_allocated_bytes_;
   // Rounds available_bytes down to the nearest multiple of kMinAllocationSize.
   available_bytes = (available_bytes / kMinAllocationSize) * kMinAllocationSize;
@@ -106,7 +108,7 @@ bool BFCAllocator::Extend(size_t rounded_bytes) {
 
   // Try allocating.
   size_t bytes = std::min(curr_region_allocation_bytes_, available_bytes);
-  void* mem_addr = suballocator_->Alloc(32, bytes);
+  void* mem_addr = suballocator_->Alloc(alignment, bytes);
   if (mem_addr == nullptr && !started_backpedal_) {
     // Only backpedal once.
     started_backpedal_ = true;
@@ -117,7 +119,7 @@ bool BFCAllocator::Extend(size_t rounded_bytes) {
     while (mem_addr == nullptr) {
       bytes = RoundedBytes(bytes * kBackpedalFactor);
       if (bytes < rounded_bytes) break;
-      mem_addr = suballocator_->Alloc(32, bytes);
+      mem_addr = suballocator_->Alloc(alignment, bytes);
     }
   }
 
@@ -206,20 +208,20 @@ void* BFCAllocator::AllocateRaw(size_t unused_alignment, size_t num_bytes,
   if (allocation_attr.no_retry_on_failure) {
     // Return immediately upon the first failure if this is for allocating an
     // optional scratch space.
-    void* result = AllocateRawInternal(unused_alignment, num_bytes, false);
+    bool dump_log_on_failure = VLOG_IS_ON(2);
+    void* result =
+        AllocateRawInternal(unused_alignment, num_bytes, dump_log_on_failure);
     if (result == nullptr) {
-      // The counter incrementing is not thread-safe. But we don't really care.
-      // TODO(zhengxq): we should implement a LOG_FIRST_N and LOG_EVERY_N for
-      // more general usage.
-      static int log_counter = 0;
-      if (log_counter < 10) {
-        log_counter++;
+      static std::atomic<int32> log_counter{0};
+      int32 counter_value = log_counter.load(std::memory_order_relaxed);
+      if (counter_value < 10) {
+        log_counter.store(counter_value + 1, std::memory_order_relaxed);
         LOG(WARNING)
             << "Allocator (" << Name() << ") ran out of memory trying "
             << "to allocate " << strings::HumanReadableNumBytes(num_bytes)
             << ". The caller indicates that this is not a failure, but"
             << " may mean that there could be performance gains if more"
-            << " memory is available.";
+            << " memory were available.";
       }
     }
     return result;
@@ -259,7 +261,7 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
   }
 
   // Try to extend
-  if (Extend(rounded_bytes)) {
+  if (Extend(unused_alignment, rounded_bytes)) {
     ptr = FindChunkPtr(bin_num, rounded_bytes, num_bytes);
     if (ptr != nullptr) {
       return ptr;
@@ -519,7 +521,7 @@ void BFCAllocator::AddAllocVisitor(Visitor visitor) {
 
 bool BFCAllocator::TracksAllocationSizes() { return true; }
 
-size_t BFCAllocator::RequestedSize(void* ptr) {
+size_t BFCAllocator::RequestedSize(const void* ptr) {
   mutex_lock l(lock_);
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle)
@@ -528,7 +530,7 @@ size_t BFCAllocator::RequestedSize(void* ptr) {
   return c->requested_size;
 }
 
-size_t BFCAllocator::AllocatedSize(void* ptr) {
+size_t BFCAllocator::AllocatedSize(const void* ptr) {
   mutex_lock l(lock_);
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle)
@@ -537,7 +539,7 @@ size_t BFCAllocator::AllocatedSize(void* ptr) {
   return c->size;
 }
 
-int64 BFCAllocator::AllocationId(void* ptr) {
+int64 BFCAllocator::AllocationId(const void* ptr) {
   mutex_lock l(lock_);
   BFCAllocator::ChunkHandle h = region_manager_.get_handle(ptr);
   CHECK(h != kInvalidChunkHandle)
@@ -614,7 +616,7 @@ string BFCAllocator::RenderOccupancy() {
     region_offset += region.memory_size();
   }
 
-  return StringPiece(rendered, resolution).ToString();
+  return std::string(rendered, resolution);
 }
 
 void BFCAllocator::DumpMemoryLog(size_t num_bytes) {
@@ -659,17 +661,9 @@ void BFCAllocator::DumpMemoryLog(size_t num_bytes) {
       const Chunk* c = ChunkFromHandle(h);
       if (c->in_use()) {
         in_use_by_size[c->size]++;
-        LOG(INFO) << "Chunk at " << c->ptr << " of size " << c->size;
       }
-      h = c->next;
-    }
-
-    h = region_manager_.get_handle(region.ptr());
-    while (h != kInvalidChunkHandle) {
-      const Chunk* c = ChunkFromHandle(h);
-      if (!c->in_use()) {
-        LOG(INFO) << "Free at " << c->ptr << " of size " << c->size;
-      }
+      LOG(INFO) << (c->in_use() ? "Chunk" : "Free ") << " at " << c->ptr
+                << " of size " << c->size;
       h = c->next;
     }
   }

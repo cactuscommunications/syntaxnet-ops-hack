@@ -166,7 +166,7 @@ TokKind HloLexer::LexIdentifier() {
     auto consumable = RegexpStringPieceFromPointers(token_start_, buf_.end());
     // 'consumable' will be advanced iff its prefix matches the pattern.
     static LazyRE2 shape_pattern = {
-        R"(^(\w*\d*)\[([\d,]*)\](?:{([\d,]*)})?)"};
+        R"(^(\w*\d*)\[([\d,]*)\](?:(dense|sparse)?{([\d,]+)})?)"};
     if (RE2::Consume(&consumable, *shape_pattern)) {
       auto status_or_shape = ShapeUtil::ParseShapeString(
           StringPieceFromPointers(token_start_, consumable.begin()));
@@ -230,7 +230,7 @@ TokKind HloLexer::LexIdentifier() {
     }
   }
 
-  str_val_ = identifier.ToString();
+  str_val_ = std::string(identifier);
   return TokKind::kIdent;
 }
 

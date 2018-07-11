@@ -52,6 +52,7 @@ cc_library(
         "flags.h",
     ],
     deps = [
+        ":embedded_protocol_buffers",
         ":runtime",  # needed by codegen to print aligned_buffer_bytes
         "//tensorflow/compiler/tf2xla",
         "//tensorflow/compiler/tf2xla:common",
@@ -59,6 +60,7 @@ cc_library(
         "//tensorflow/compiler/tf2xla:tf2xla_util",
         "//tensorflow/compiler/tf2xla:xla_compiler",
         "//tensorflow/compiler/tf2xla/kernels:xla_cpu_only_ops",
+        "//tensorflow/compiler/tf2xla/kernels:xla_dummy_ops",
         "//tensorflow/compiler/tf2xla/kernels:xla_ops",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:statusor",
@@ -68,11 +70,10 @@ cc_library(
         "//tensorflow/compiler/xla/client:compile_only_client",
         "//tensorflow/compiler/xla/service:compiler",
         "//tensorflow/compiler/xla/service/cpu:cpu_compiler",
-        "//tensorflow/core:core_cpu",
         "//tensorflow/core:core_cpu_internal",
-        "//tensorflow/core:framework",
         "//tensorflow/core:framework_internal",
         "//tensorflow/core:lib",
+        "//tensorflow/core:lib_internal",
         "//tensorflow/core:protos_all_cc",
     ],
 )
@@ -80,13 +81,18 @@ cc_library(
 tf_cc_test(
     name = "codegen_test",
     srcs = ["codegen_test.cc"],
-    data = ["codegen_test_h.golden"],
+    data = [
+        "codegen_test_h.golden",
+        "codegen_test_o.golden",
+    ],
     deps = [
         ":tfcompile_lib",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/core:lib",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
+        "@llvm//:support",  # fixdeps: keep
+        "@llvm//:x86_code_gen",  # fixdeps: keep
     ],
 )
 
@@ -128,7 +134,9 @@ tf_library(
     config = "test_graph_tfadd.config.pbtxt",
     cpp_class = "AddComp",
     graph = "test_graph_tfadd.pbtxt",
-    tags = ["manual"],
+    tags = [
+        "manual",
+    ],
 )
 
 # A test of tf_library that includes a graph with an unknown op, but where
@@ -139,7 +147,9 @@ tf_library(
     config = "test_graph_tfunknownop.config.pbtxt",
     cpp_class = "UnknownOpAddComp",
     graph = "test_graph_tfunknownop.pbtxt",
-    tags = ["manual"],
+    tags = [
+        "manual",
+    ],
 )
 
 # A test of tf_library that includes a graph with an unknown op, but where
@@ -151,7 +161,9 @@ tf_library(
     config = "test_graph_tfunknownop2.config.pbtxt",
     cpp_class = "UnknownOpAddComp",
     graph = "test_graph_tfunknownop.pbtxt",
-    tags = ["manual"],
+    tags = [
+        "manual",
+    ],
 )
 
 # A test of tf_library that includes a graph with an unknown op, but where
@@ -162,7 +174,9 @@ tf_library(
     config = "test_graph_tfunknownop3.config.pbtxt",
     cpp_class = "UnknownOpAddComp",
     graph = "test_graph_tfunknownop.pbtxt",
-    tags = ["manual"],
+    tags = [
+        "manual",
+    ],
 )
 
 # Utility library for benchmark binaries, used by the *_benchmark rules that are
@@ -185,9 +199,24 @@ cc_library(
     name = "benchmark_extra_android",
     tags = [
         "manual",
-        "notap",
     ],
     visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "embedded_protocol_buffers",
+    srcs = ["embedded_protocol_buffers.cc"],
+    hdrs = ["embedded_protocol_buffers.h"],
+    deps = [
+        "//tensorflow/compiler/tf2xla:common",
+        "//tensorflow/compiler/xla:statusor",
+        "//tensorflow/compiler/xla:util",
+        "//tensorflow/compiler/xla/service/llvm_ir:llvm_util",
+        "//tensorflow/core:lib",
+        "@llvm//:core",
+        "@llvm//:support",
+        "@llvm//:target",
+    ],
 )
 
 tf_cc_test(
@@ -221,17 +250,3 @@ exports_files([
     "benchmark_main.template",  # used by tf_library(...,gen_benchmark=True)
     "test.cc",  # used by tf_library(...,gen_test=True)
 ])
-
-# -----------------------------------------------------------------------------
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
-)

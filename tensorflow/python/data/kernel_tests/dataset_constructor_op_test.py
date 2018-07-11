@@ -263,7 +263,7 @@ class DatasetConstructorTest(test.TestCase):
       for i in range(3):
         results = sess.run(get_next)
         for component, result_component in zip(
-            (zip(*components[:3])[i] + expected[i]), results):
+            (list(zip(*components[:3]))[i] + expected[i]), results):
           if sparse_tensor.is_sparse(component):
             self.assertSparseValuesEqual(component, result_component)
           else:
@@ -486,11 +486,12 @@ class DatasetConstructorTest(test.TestCase):
       sess.run(var_1.initializer)
 
       iterator = dataset.make_initializable_iterator()
+      sess.run(iterator.initializer)
 
       with self.assertRaisesRegexp(
-          errors.InvalidArgumentError,
-          "Trying to access resource located in device"):
-        sess.run(iterator.initializer)
+          errors.FailedPreconditionError,
+          "Error while reading resource variable Variable"):
+        sess.run(iterator.get_next())
 
 
 class DatasetConstructorBenchmark(test.Benchmark):

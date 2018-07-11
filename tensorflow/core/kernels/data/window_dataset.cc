@@ -26,7 +26,7 @@ class WindowDataset : public DatasetBase {
         output_types_(std::move(output_types)),
         output_shapes_(std::move(output_shapes)) {}
 
-  std::unique_ptr<IteratorBase> MakeIterator(
+  std::unique_ptr<IteratorBase> MakeIteratorInternal(
       const string& prefix) const override {
     return std::unique_ptr<IteratorBase>(
         new Iterator({this, strings::StrCat(prefix, "::Window")}));
@@ -38,7 +38,7 @@ class WindowDataset : public DatasetBase {
     return output_shapes_;
   }
 
-  string DebugString() override { return "WindowDataset"; }
+  string DebugString() const override { return "WindowDataset"; }
 
  private:
   class Iterator : public DatasetIterator<WindowDataset> {
@@ -65,7 +65,7 @@ class WindowDataset : public DatasetBase {
       return Status::OK();
     }
 
-    Status RestoreInternal(OpKernelContext* ctx,
+    Status RestoreInternal(IteratorContext* ctx,
                            IteratorStateReader* reader) override {
       mutex_lock l(mu_);
       int64 i;
